@@ -1,10 +1,10 @@
 # Colcon cc-build
 
-Colcon pluing for cross-compilation
+Colcon plugin for cross-compilation
 
-## Usage 
+## Usage
 
-### Install prerequisites 
+### Install prerequisites
 
 The cross compilation toolchain and docker have to be installed. The following instruction have been tested on Ubuntu Xenial.
 
