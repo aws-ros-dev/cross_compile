@@ -63,7 +63,7 @@ _default_platforms = {
     Toolchain('TODO', 'arm', 'arm-linux-gnueabihf'),
     Platform('generic_armhf', 'ubuntu_bionic', 'dashing', 'fastrtps'):
     Toolchain('TODO', 'arm', 'arm-linux-gnueabihf')
-    }
+}
 
 
 def _platform_info_for_args(args):
