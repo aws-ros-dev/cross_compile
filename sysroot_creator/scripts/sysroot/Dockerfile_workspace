@@ -1,3 +1,8 @@
+# This dockerfile takes ROS2 source packages from ./src and builds them for the specified target platform.
+# It uses qemu user-mode static emulation libraries from ./qemu-user-static to emulate the target platform.
+
+# Assumptions: ./qemu-user-static and ./src exist and have qemu libraries and ros2 source packages in them resdpectively.
+
 ARG ROS2_BASE_IMG
 FROM ${ROS2_BASE_IMG}
 ARG ROS2_WORKSPACE
@@ -7,9 +12,11 @@ ARG TARGET_TRIPLE
 COPY ${ROS2_WORKSPACE}/qemu-user-static/* /usr/bin/
 RUN rm -rf /var/lib/apt/lists/*
 RUN apt-get update && apt-get install -y locales
+
 RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LC_ALL C.UTF-8
+
 RUN apt-get install -y \
     python3-colcon-common-extensions \
     python3-pip \

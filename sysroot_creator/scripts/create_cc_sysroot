@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 
+"""Script to generate sysroot for cross-compiling ROS2."""
+
 import argparse
 import os
-from pathlib import Path
 import re
 import shutil
 import tarfile
 import tempfile
+from pathlib import Path
 
 import docker
+
 import jinja2
 
 
@@ -23,7 +26,7 @@ fi
 export TARGET_ARCH={{target_arch}}
 export TARGET_TRIPLE={{target_triple}}
 export CC_ROOT={{cc_root}}
-""")
+""")  # noqa
 
 CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE = jinja2.Template("""
 sudo rm -rf /lib/{{target_triple}}
@@ -36,7 +39,7 @@ CROSS_COMPILER_LIB_BAK=$CROSS_COMPILER_LIB_$(date +%s).bak
 echo "Backing up $CROSS_COMPILER_LIB to $CROSS_COMPILER_LIB_BAK"
 sudo mv $CROSS_COMPILER_LIB $CROSS_COMPILER_LIB_BAK
 sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} $CROSS_COMPILER_LIB
-""")
+""")  # noqa
 
 SYSROOT_DIR_NAME: str = 'sysroot'
 DOCKER_WS_NAME: str = 'Dockerfile_workspace'
@@ -44,6 +47,15 @@ DOCKER_CLIENT = docker.from_env()
 
 
 class Platform:
+    """A class that represents platform specification for cross compiling.
+
+    Includes:
+    1. Target architecture
+    2. Target operating system
+    3. ROS2 distribution used
+    4. RMW implementation used
+    """
+
     def __init__(self, arch, os, distro, rmw):
         self.arch = arch
         self.os = os
@@ -60,6 +72,15 @@ class Platform:
 
 
 class DockerConfig:
+    """
+    A class that represents docker build parameters used in creating sysroot.
+
+    Includes:
+    1. Base docker image to use for building sysroot
+    2. Docker network mode
+    3. Setting to enable/disable caching during docker build
+    """
+
     def __init__(self, base_image, network_mode, nocache):
         self.base_image = base_image
         self.network_mode = network_mode
@@ -86,7 +107,7 @@ def setup_cc_root_dir(platform: Platform) -> Path:
 
 def setup_sysroot_dir(cc_root_dir: Path, force_sysroot_build: bool) -> Path:
     log('Creating sysroot directory')
-    target_sysroot = cc_root_dir / 'sysroot'
+    target_sysroot = cc_root_dir / SYSROOT_DIR_NAME
 
     if target_sysroot.exists():
         if not force_sysroot_build:
@@ -100,23 +121,28 @@ def setup_sysroot_dir(cc_root_dir: Path, force_sysroot_build: bool) -> Path:
     return target_sysroot
 
 
-def get_workspace_image_tag() -> str:
-    return os.getenv('USER') + '/' + Path.cwd().name + ':latest'
+def get_workspace_image_tag(platform: Platform) -> str:
+    return os.getenv('USER') + '/' + platform.__str__() + ':latest'
 
 
-def build_workspace_sysroot_image(platform: Platform, docker_args: DockerConfig, image_tag: str):
+def build_workspace_sysroot_image(
+        platform: Platform,
+        docker_args: DockerConfig,
+        image_tag: str):
     log('Fetching sysroot base image {}'.format(docker_args.base_image))
     DOCKER_CLIENT.images.pull(docker_args.base_image)
     # FIXME consider moving constants to static fields
-    workspace_dockerfile_path = (Path(__file__).parent / SYSROOT_DIR_NAME / DOCKER_WS_NAME)
+    workspace_dockerfile_path = (Path(__file__).parent / SYSROOT_DIR_NAME /
+                                 DOCKER_WS_NAME)
 
     buildargs = {
         'ROS2_BASE_IMG': docker_args.base_image,
-        'ROS2_WORKSPACE': './sysroot',
+        'ROS2_WORKSPACE': './' + SYSROOT_DIR_NAME,
         'ROS_DISTRO': platform.distro,
         'TARGET_TRIPLE': platform.cc_toolchain
     }
-    log('Building workspace image {} (this might take some time...)'.format(image_tag))
+    log('Building workspace image {} (this might take some time...)'
+        .format(image_tag))
     # FIXME: this gives no output until the whole image is built,
     # at least implement some spinner
     try:
@@ -146,7 +172,7 @@ def export_workspace_sysroot_image(image_tag, target_sysroot_path):
     log('Exporting sysroot to path [{}]'.format(target_sysroot_path))
     shutil.rmtree(str(target_sysroot_path), ignore_errors=True)
     tmp_sysroot_dir = tempfile.mkdtemp(suffix='-cc_build')
-    sysroot_tarball_path = Path(tmp_sysroot_dir) / 'sysroot.tar'
+    sysroot_tarball_path = Path(tmp_sysroot_dir) / (SYSROOT_DIR_NAME + '.tar')
     log('Exporting filesystem of image {} into tarball {}'.format(
         image_tag, sysroot_tarball_path))
     try:
@@ -159,8 +185,10 @@ def export_workspace_sysroot_image(image_tag, target_sysroot_path):
             relevant_dirs = ['lib', 'usr', 'etc', 'opt', 'root_path']
             relevant_members = (
                 m for m in sysroot_tar.getmembers()
-                if re.match('^({}).*'.format('|'.join(relevant_dirs)), m.name) is not None)
-            sysroot_tar.extractall(str(target_sysroot_path), members=relevant_members)
+                if re.match('^({}).*'.format('|'.join(relevant_dirs)), m.name)
+                is not None)
+            sysroot_tar.extractall(str(target_sysroot_path),
+                                   members=relevant_members)
     finally:
         shutil.rmtree(tmp_sysroot_dir, ignore_errors=True)
     log('Success exporting sysroot to path [{}]'.format(target_sysroot_path))
@@ -181,10 +209,11 @@ def write_cc_build_setup_file(platform: Platform, cc_root_dir: Path):
 
 def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform):
     cc_system_setup_script_path = cc_root_dir / 'cc_system_setup.bash'
-    cc_system_setup_script_contents = CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.render(
-        cc_root=cc_root_dir,
-        target_triple=platform.cc_toolchain
-    )
+    cc_system_setup_script_contents = \
+        CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.render(
+            cc_root=cc_root_dir,
+            target_triple=platform.cc_toolchain
+        )
     with open(str(cc_system_setup_script_path), 'w') as out_f:
         out_f.write(cc_system_setup_script_contents)
     return cc_system_setup_script_path
@@ -222,19 +251,20 @@ def create_arg_parser():
         '--docker-network-mode',
         type=str,
         default='host',
-        help="Docker's network_mode parameter to use for all Docker interactions")
+        help="Docker's network_mode parameter to use for all "
+             'Docker interactions')
     parser.add_argument(
         '--sysroot-nocache',
         type=bool,
         default=False,
-        help="When set to true, this disables Docker's cache when building the image for the"
-             'workspace sysroot')
+        help="When set to true, this disables Docker's cache when building "
+             'the image for the workspace sysroot')
     parser.add_argument(
         '--force-sysroot-build',
         type=bool,
         default=False,
         help='When set to true, we rebuild the sysroot and sysroot image, '
-             'even if any of those is availble')
+             'even if any of those is available')
     return parser
 
 
@@ -243,22 +273,28 @@ def main():
     args = parser.parse_args()
     platform = Platform(args.arch, args.os, args.distro, args.rmw)
     docker_args = DockerConfig(
-        args.sysroot_base_image, args.docker_network_mode, args.sysroot_nocache)
+        args.sysroot_base_image,
+        args.docker_network_mode,
+        args.sysroot_nocache)
 
     cc_root_dir = setup_cc_root_dir(platform)
     sysroot_dir = setup_sysroot_dir(cc_root_dir, args.force_sysroot_build)
-    build_workspace_sysroot_image(platform, docker_args, get_workspace_image_tag())
-    export_workspace_sysroot_image(get_workspace_image_tag(), sysroot_dir)
+    docker_image_tag = get_workspace_image_tag(platform)
+    build_workspace_sysroot_image(platform, docker_args, docker_image_tag)
+    export_workspace_sysroot_image(docker_image_tag, sysroot_dir)
 
     cc_build_setup_file_path = write_cc_build_setup_file(platform, cc_root_dir)
     # generalization of the Poco hack
     # from https://github.com/ros2/cross_compile/blob/master/entry_point.sh#L38
-    cc_system_setup_script_path = write_cc_system_setup_script(cc_root_dir, platform)
+    cc_system_setup_script_path = write_cc_system_setup_script(
+        cc_root_dir, platform)
+
     print("""
 
     In order to complete the cross compilation setup, please
 
-    1. WORKAROUND: run the command below to setup using sysroot's GLIBC for cross compilation.
+    1. WORKAROUND: run the command below to setup using sysroot's GLIBC for
+    cross compilation.
 
        bash {cc_system_setup_script_path}
 
