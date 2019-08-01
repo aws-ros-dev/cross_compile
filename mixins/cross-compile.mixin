@@ -1,0 +1,17 @@
+{
+    "build": {
+        "pi_armhf-raspbian_stretch": {
+            "cmake-args": [
+                "-DCMAKE_SYSTEM_NAME=Linux",
+                "-DCMAKE_SYSTEM_VERSION=1",
+                "-DCMAKE_SYSTEM_PROCESSOR=arm",
+                "-DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabihf-gcc",
+                "-DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabihf-g++",
+                "-DCMAKE_LIBRARY_ARCHITECTURE=arm-linux-gnueabihf"
+            ],
+            "cmake-clean-cache": true,
+            "cmake-force-configure": true,
+            "merge-install": true
+        }
+    }
+}

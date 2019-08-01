@@ -26,6 +26,26 @@ newgrp docker # this reloads the group permissions in the current shell, unneces
 docker run hello-world
 ```
 
+Next we need to setup our sysroot directory for the docker image. Docker can only copy from a specific
+context so all these assets need to be copied relative to the `Dockerfile` path.
+```bash
+# Create a directory to store qemu assets
+mkdir qemu-user-static
+cp /usr/bin/qemu-* $ROS2_WORKSPACE/qemu-user-static 
+# Copy ROS Sources
+cp -r ~/ros2_ws/src .
+```
+In the end your Directory should be as follows:
+```bash
+sysroot
+ |
+ |-- Dockerfile_workspace
+ +-- qemu-user-static
+ |   +-- qemu-*-static
+ +-- src
+     + -- ros2 packages ...
+```
+
 ### Building a workspace
 
 ```bash

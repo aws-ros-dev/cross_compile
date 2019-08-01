@@ -6,8 +6,11 @@ import argparse
 import os
 import re
 import shutil
+import sys
 import tarfile
 import tempfile
+import threading
+import time
 from pathlib import Path
 
 import docker
@@ -81,10 +84,45 @@ class DockerConfig:
     3. Setting to enable/disable caching during docker build
     """
 
-    def __init__(self, base_image, network_mode, nocache):
+    def __init__(self, base_image, network_mode, nocache, ros2_workspace):
         self.base_image = base_image
         self.network_mode = network_mode
         self.nocache = nocache
+        self.ros2_workspace = ros2_workspace
+
+
+class Spinner:
+    busy = False
+    delay = 0.1
+
+    @staticmethod
+    def spinning_cursor():
+        while 1:
+            for cursor in '|/-\\':
+                yield cursor
+
+    def __init__(self, delay=None):
+        self.spinner_generator = self.spinning_cursor()
+        if delay and float(delay):
+            self.delay = delay
+
+    def spinner_task(self):
+        while self.busy:
+            sys.stdout.write(next(self.spinner_generator))
+            sys.stdout.flush()
+            time.sleep(self.delay)
+            sys.stdout.write('\b')
+            sys.stdout.flush()
+
+    def __enter__(self):
+        self.busy = True
+        threading.Thread(target=self.spinner_task).start()
+
+    def __exit__(self, exception, value, tb):
+        self.busy = False
+        time.sleep(self.delay)
+        if exception is not None:
+            return False
 
 
 def log(*args, **kwargs):
@@ -143,18 +181,18 @@ def build_workspace_sysroot_image(
     }
     log('Building workspace image {} (this might take some time...)'
         .format(image_tag))
-    # FIXME: this gives no output until the whole image is built,
-    # at least implement some spinner
+
     try:
-        workspace_image, ws_image_build_logs = DOCKER_CLIENT.images.build(
-            path='.',
-            dockerfile=str(workspace_dockerfile_path),
-            tag=image_tag,
-            buildargs=buildargs,
-            quiet=False,
-            nocache=docker_args.nocache,
-            network_mode=docker_args.network_mode)
-        print('Docker build output')
+        with Spinner():
+            workspace_image, ws_image_build_logs = DOCKER_CLIENT.images.build(
+                path='.',
+                dockerfile=str(workspace_dockerfile_path),
+                tag=image_tag,
+                buildargs=buildargs,
+                quiet=False,
+                nocache=docker_args.nocache,
+                network_mode=docker_args.network_mode)
+        print('Docker build output: ')
         print_docker_logs(ws_image_build_logs)
         print()
     except docker.errors.BuildError as be:
@@ -265,24 +303,31 @@ def create_arg_parser():
         default=False,
         help='When set to true, we rebuild the sysroot and sysroot image, '
              'even if any of those is available')
+    parser.add_argument(
+        '--ros2-workspace',
+        type=str,
+        default='~/ros2_ws',
+        help='The location of your ROS2 workspace. Usually ~/ros2_ws.')
     return parser
 
 
 def main():
+    # Configuration
     parser = create_arg_parser()
     args = parser.parse_args()
     platform = Platform(args.arch, args.os, args.distro, args.rmw)
     docker_args = DockerConfig(
         args.sysroot_base_image,
         args.docker_network_mode,
-        args.sysroot_nocache)
+        args.sysroot_nocache,
+        args.ros2_workspace)
 
+    # Main pipeline
     cc_root_dir = setup_cc_root_dir(platform)
     sysroot_dir = setup_sysroot_dir(cc_root_dir, args.force_sysroot_build)
     docker_image_tag = get_workspace_image_tag(platform)
     build_workspace_sysroot_image(platform, docker_args, docker_image_tag)
     export_workspace_sysroot_image(docker_image_tag, sysroot_dir)
-
     cc_build_setup_file_path = write_cc_build_setup_file(platform, cc_root_dir)
     # generalization of the Poco hack
     # from https://github.com/ros2/cross_compile/blob/master/entry_point.sh#L38

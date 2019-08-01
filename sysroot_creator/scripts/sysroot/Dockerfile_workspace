@@ -1,7 +1,7 @@
 # This dockerfile takes ROS2 source packages from ./src and builds them for the specified target platform.
 # It uses qemu user-mode static emulation libraries from ./qemu-user-static to emulate the target platform.
 
-# Assumptions: ./qemu-user-static and ./src exist and have qemu libraries and ros2 source packages in them resdpectively.
+# Assumptions: ./qemu-user-static and ./src exist and have qemu libraries and ros2 source packages in them respectively.
 
 ARG ROS2_BASE_IMG
 FROM ${ROS2_BASE_IMG}
@@ -11,6 +11,7 @@ ARG TARGET_TRIPLE
 
 COPY ${ROS2_WORKSPACE}/qemu-user-static/* /usr/bin/
 RUN rm -rf /var/lib/apt/lists/*
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
 RUN apt-get update && apt-get install -y locales
 
 RUN locale-gen en_US.UTF-8
