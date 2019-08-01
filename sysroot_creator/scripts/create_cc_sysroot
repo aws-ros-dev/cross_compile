@@ -16,9 +16,10 @@ import jinja2
 
 
 CC_BUILD_SETUP_FILE_TEMPLATE = jinja2.Template("""
+shell=`echo $SHELL | awk -F/ '{print $NF}'`
 if [ -d {{ros_root}} ]
 then
-    source {{ros_root}}/setup.bash
+    source {{ros_root}}/setup.$shell
 else
     echo "WARNING: no ROS distro found on the sysroot"
 fi
@@ -34,8 +35,10 @@ sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} /lib/{{target_triple}}
 sudo rm -rf /usr/lib/{{target_triple}}
 sudo ln -s {{cc_root}}/sysroot/usr/lib/{{target_triple}} /usr/lib/{{target_triple}}
 
+sudo cp /usr/{{target_triple}}/lib/ld-*.so* /lib/
+
 CROSS_COMPILER_LIB=/usr/{{target_triple}}/lib
-CROSS_COMPILER_LIB_BAK=$CROSS_COMPILER_LIB_$(date +%s).bak
+CROSS_COMPILER_LIB_BAK=/usr/{{target_triple}}/lib_$(date +%s).bak
 echo "Backing up $CROSS_COMPILER_LIB to $CROSS_COMPILER_LIB_BAK"
 sudo mv $CROSS_COMPILER_LIB $CROSS_COMPILER_LIB_BAK
 sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} $CROSS_COMPILER_LIB
