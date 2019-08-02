@@ -1,15 +1,29 @@
 {
     "build": {
+        "armhf": {
+            "cmake-args": [
+                "-DCMAKE_TOOLCHAIN_FILE=/home/ubuntu/aws-ros-dev/cross_compile/mixins/cmake-toolchains/armhf-linux.cmake"
+            ],
+            "cmake-clean-cache": true,
+            "cmake-clean-first": true,
+            "cmake-force-configure": true,
+            "merge-install": true
+        },
         "pi_armhf-raspbian_stretch": {
             "cmake-args": [
                 "-DCMAKE_SYSTEM_NAME=Linux",
                 "-DCMAKE_SYSTEM_VERSION=1",
-                "-DCMAKE_SYSTEM_PROCESSOR=arm",
+                "-DCMAKE_SYSTEM_PROCESSOR=aarch64",
                 "-DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabihf-gcc",
                 "-DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabihf-g++",
-                "-DCMAKE_LIBRARY_ARCHITECTURE=arm-linux-gnueabihf"
+                "-DCMAKE_LIBRARY_ARCHITECTURE=arm-linux-gnueabihf",
+                "-DCMAKE_FIND_ROOT_PATH=/home/ubuntu/aws-ros-dev/cross_compile/sysroot_creator/scripts/armhf-ubuntu-fastrtps-dashing/sysroot",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH"
             ],
             "cmake-clean-cache": true,
+            "cmake-clean-first": true,
             "cmake-force-configure": true,
             "merge-install": true
         }

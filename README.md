@@ -89,3 +89,15 @@ docker image build -f colcon_cc_build/colcon_cc_build/verb/sysroot/Dockerfile_wo
 
 docker container run -it --rm --network=host --name test ros2_benchmark_pipeline:latest bash
 ```
+
+### Troubleshooting
+
+#### Lib Poco Issue
+From the ROS2 Cross compilation docs:
+> The Poco pre-built has a known issue where it is searching for libz and libpcre on the host system instead of SYSROOT. 
+> As a workaround for the moment, please link both libraries into the the host’s file-system.
+> ```bash
+> mkdir -p /usr/lib/$TARGET_TRIPLE
+> ln -s `pwd`/sysroot_docker/lib/$TARGET_TRIPLE/libz.so.1 /usr/lib/$TARGET_TRIPLE/libz.so
+> ln -s `pwd`/sysroot_docker/lib/$TARGET_TRIPLE/libpcre.so.3 /usr/lib/$TARGET_TRIPLE/libpcre.so
+> ```
