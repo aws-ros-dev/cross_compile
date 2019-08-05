@@ -14,7 +14,8 @@ import time
 from pathlib import Path
 
 import docker
-
+from docker import APIClient
+from tqdm import tqdm
 import jinja2
 
 
@@ -91,40 +92,6 @@ class DockerConfig:
         self.ros2_workspace = ros2_workspace
 
 
-class Spinner:
-    busy = False
-    delay = 0.1
-
-    @staticmethod
-    def spinning_cursor():
-        while 1:
-            for cursor in '|/-\\':
-                yield cursor
-
-    def __init__(self, delay=None):
-        self.spinner_generator = self.spinning_cursor()
-        if delay and float(delay):
-            self.delay = delay
-
-    def spinner_task(self):
-        while self.busy:
-            sys.stdout.write(next(self.spinner_generator))
-            sys.stdout.flush()
-            time.sleep(self.delay)
-            sys.stdout.write('\b')
-            sys.stdout.flush()
-
-    def __enter__(self):
-        self.busy = True
-        threading.Thread(target=self.spinner_task).start()
-
-    def __exit__(self, exception, value, tb):
-        self.busy = False
-        time.sleep(self.delay)
-        if exception is not None:
-            return False
-
-
 def log(*args, **kwargs):
     print(*args, **kwargs)
 
@@ -183,18 +150,27 @@ def build_workspace_sysroot_image(
         .format(image_tag))
 
     try:
-        with Spinner():
-            workspace_image, ws_image_build_logs = DOCKER_CLIENT.images.build(
-                path='.',
-                dockerfile=str(workspace_dockerfile_path),
-                tag=image_tag,
-                buildargs=buildargs,
-                quiet=False,
-                nocache=docker_args.nocache,
-                network_mode=docker_args.network_mode)
-        print('Docker build output: ')
-        print_docker_logs(ws_image_build_logs)
-        print()
+        docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
+        log_generator = docker_client.build(
+            path='.',
+            dockerfile=str(workspace_dockerfile_path),
+            tag=image_tag,
+            buildargs=buildargs,
+            quiet=False,
+            nocache=docker_args.nocache,
+            network_mode=docker_args.network_mode,
+            decode=True)
+        with tqdm(log_generator) as t:
+            for chunk in t:
+                try:
+                    line = chunk['stream'].rstrip().lstrip()
+                    if line == '':
+                        continue
+                    t.set_postfix_str(line)
+                except (KeyError, AttributeError) as e:
+                    print("Error reading the Dockerfile image. The following exception"
+                          "was caught:\n{}".format(e))
+                    sys.exit(0)
     except docker.errors.BuildError as be:
         print('Error building sysroot image')
         print('\tError message: {}'.format(be.msg))
