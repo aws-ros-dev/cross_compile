@@ -9,8 +9,6 @@ import shutil
 import sys
 import tarfile
 import tempfile
-import threading
-import time
 from pathlib import Path
 
 import docker
@@ -236,51 +234,61 @@ def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform):
 def create_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--arch',
+        '-a', '--arch',
         required=True,
         type=str,
+        choices=['armhf', 'aarch64'],
         help='Target architecture')
     parser.add_argument(
-        '--os',
+        '-o', '--os',
         required=True,
         type=str,
+        choices=['ubuntu', 'debian'],
         help='Target OS')
     parser.add_argument(
-        '--distro',
+        '-d', '--distro',
         required=False,
         type=str,
         default='dashing',
+        choices=['ardent', 'bouncy', 'crystal', 'dashing'],
         help='Target ROS distribution')
     parser.add_argument(
-        '--rmw',
+        '-r', '--rmw',
         required=False,
         type=str,
         default='fastrtps',
+        choices=['fatrtps', 'opensplice', 'connext'],
         help='Target RMW implementation')
     parser.add_argument(
         '--sysroot-base-image',
+        required=False,
         type=str,
-        help='Base image to use for building the sysroot')
+        help='Base Docker image to use for building the sysroot.'
+             'Ex. juanrh/ros2:armhf_bionic_crystal_fastrtps_prebuilt-crystal')
     parser.add_argument(
         '--docker-network-mode',
+        required=False,
         type=str,
         default='host',
         help="Docker's network_mode parameter to use for all "
              'Docker interactions')
     parser.add_argument(
         '--sysroot-nocache',
+        required=False,
         type=bool,
         default=False,
         help="When set to true, this disables Docker's cache when building "
              'the image for the workspace sysroot')
     parser.add_argument(
         '--force-sysroot-build',
+        required=False,
         type=bool,
         default=False,
         help='When set to true, we rebuild the sysroot and sysroot image, '
              'even if any of those is available')
     parser.add_argument(
         '--ros2-workspace',
+        required=False,
         type=str,
         default='~/ros2_ws',
         help='The location of your ROS2 workspace. Usually ~/ros2_ws.')
