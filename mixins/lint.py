@@ -1,14 +1,28 @@
 #!/usr/bin/env python3
 
-"""Lint the index.yaml file as well as all files ending with .mixin."""
+"""
+Lint the index.yaml file as well as all files ending with .mixin.
+Taken from https://github.com/colcon/colcon-mixin-repository.
+Modified for the AWS mixins repository.
+"""
+__author__ = 'Dirk Thomas'
+__license__ = 'CC0 1.0 Universal'
+__maintainer__ = 'Dirk Thomas'
 
+import logging
 import os
 import sys
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 try:
     from yamllint.cli import run
 except ImportError:
-    sys.exit("Failed to import Python package 'yamllint'")
+    logger.exception("Failed to import Python package 'yamllint'")
+    sys.exit(0)
 
 any_error = False
 for name in sorted(os.listdir()):
@@ -30,6 +44,7 @@ for name in sorted(os.listdir()):
             '--strict',
             name,
         ])
+        logger.info("Linting complete.")
     except SystemExit as e:
         any_error |= bool(e.code)
         continue

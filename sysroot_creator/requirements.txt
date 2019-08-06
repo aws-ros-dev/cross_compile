@@ -6,6 +6,7 @@ certifi==2019.6.16
 chardet==3.0.4
 colcon-argcomplete==0.3.3
 colcon-bash==0.3.2
+-e git+git@github.com:aws-ros-dev/cross_compile.git@80b696460f45accde6f87d142783c7dc61519bef#egg=colcon_cc_build&subdirectory=colcon_cc_build
 colcon-cmake==0.2.13
 colcon-common-extensions==0.2.0
 colcon-core==0.3.23
@@ -33,7 +34,7 @@ docutils==0.15.1
 empy==3.3.4
 idna==2.8
 importlib-metadata==0.19
-jinja2==2.10.1
+Jinja2==2.10.1
 MarkupSafe==1.1.1
 more-itertools==7.2.0
 packaging==19.0
@@ -53,6 +54,7 @@ rosdep==0.15.2
 rosdistro==0.7.4
 rospkg==1.1.9
 six==1.12.0
+tqdm==4.32.2
 urllib3==1.25.3
 vcstool==0.2.2
 wcwidth==0.1.7

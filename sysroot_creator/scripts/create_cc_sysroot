@@ -3,18 +3,19 @@
 """Script to generate sysroot for cross-compiling ROS2."""
 
 import argparse
+import logging
 import os
+from pathlib import Path
 import re
 import shutil
 import sys
 import tarfile
 import tempfile
-from pathlib import Path
 
 import docker
 from docker import APIClient
-from tqdm import tqdm
 import jinja2
+from tqdm import tqdm
 
 
 CC_BUILD_SETUP_FILE_TEMPLATE = jinja2.Template("""
@@ -46,6 +47,8 @@ sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} $CROSS_COMPILER_LIB
 SYSROOT_DIR_NAME: str = 'sysroot'
 DOCKER_WS_NAME: str = 'Dockerfile_workspace'
 DOCKER_CLIENT = docker.from_env()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class Platform:
@@ -83,25 +86,18 @@ class DockerConfig:
     3. Setting to enable/disable caching during docker build
     """
 
-    def __init__(self, base_image, network_mode, nocache, ros2_workspace):
+    def __init__(self, base_image, network_mode, nocache):
         self.base_image = base_image
         self.network_mode = network_mode
         self.nocache = nocache
-        self.ros2_workspace = ros2_workspace
 
-
-def log(*args, **kwargs):
-    print(*args, **kwargs)
-
-
-def print_docker_logs(logs):
-    for stream_obj in logs:
-        for line in stream_obj.get('stream', '').split('\n'):
-            log('{}'.format(line))
+    def __str__(self):
+        return "Base Image: {}\nNetwork Mode: {}\nCaching: {}".format(
+            self.base_image, self.network_mode, self.nocache)
 
 
 def setup_cc_root_dir(platform: Platform) -> Path:
-    log('Creating workspace directory')
+    logger.info('Creating workspace directory...')
     cc_root = Path.cwd() / str(platform)
     cc_root.mkdir(parents=True, exist_ok=True)
     (cc_root / 'COLCON_IGNORE').touch()
@@ -109,16 +105,16 @@ def setup_cc_root_dir(platform: Platform) -> Path:
 
 
 def setup_sysroot_dir(cc_root_dir: Path, force_sysroot_build: bool) -> Path:
-    log('Creating sysroot directory')
+    logger.info('Creating sysroot directory...')
     target_sysroot = cc_root_dir / SYSROOT_DIR_NAME
 
     if target_sysroot.exists():
         if not force_sysroot_build:
-            log('Using existing sysroot found at: {}'.format(target_sysroot))
+            logger.info('Using existing sysroot found at: {}'.format(target_sysroot))
         else:
-            log('Sysroot exists - forcing rebuild')
+            logger.info('Sysroot exists - forcing rebuild')
     else:
-        log('Sysroot not found, building now')
+        logger.warning('Sysroot not found, building now')
         os.makedirs(str(target_sysroot))
 
     return target_sysroot
@@ -132,7 +128,7 @@ def build_workspace_sysroot_image(
         platform: Platform,
         docker_args: DockerConfig,
         image_tag: str):
-    log('Fetching sysroot base image {}'.format(docker_args.base_image))
+    logger.info('Fetching sysroot base image: {}'.format(docker_args.base_image))
     DOCKER_CLIENT.images.pull(docker_args.base_image)
     # FIXME consider moving constants to static fields
     workspace_dockerfile_path = (Path(__file__).parent / SYSROOT_DIR_NAME /
@@ -144,10 +140,10 @@ def build_workspace_sysroot_image(
         'ROS_DISTRO': platform.distro,
         'TARGET_TRIPLE': platform.cc_toolchain
     }
-    log('Building workspace image {} (this might take some time...)'
-        .format(image_tag))
+    logger.info('Building workspace image: {}'.format(image_tag))
 
     try:
+        # Switch to low-level API to expose build logs
         docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
         log_generator = docker_client.build(
             path='.',
@@ -158,35 +154,38 @@ def build_workspace_sysroot_image(
             nocache=docker_args.nocache,
             network_mode=docker_args.network_mode,
             decode=True)
+        # Progress bar with postfix
         with tqdm(log_generator) as t:
             for chunk in t:
                 try:
+                    # Remove carriage returns and new lines ('\r\n')
                     line = chunk['stream'].rstrip().lstrip()
                     if line == '':
                         continue
                     t.set_postfix_str(line)
                 except (KeyError, AttributeError) as e:
-                    print("Error reading the Dockerfile image. The following exception"
-                          "was caught:\n{}".format(e))
+                    logger.exception("Error reading the Dockerfile image. The following "
+                                     "exception was caught:\n{}".format(e))
                     sys.exit(0)
     except docker.errors.BuildError as be:
-        print('Error building sysroot image')
-        print('\tError message: {}'.format(be.msg))
-        print('\tBuild log')
-        print_docker_logs(be.build_log)
-        print()
+        logger.exception('Error building sysroot image. The following exception was '
+                         'caught:\n{}'.format(be.msg))
+        logger.exception('Build log:')
+        for stream_obj in be.build_log:
+            for line in stream_obj.get('stream', '').split('\n'):
+                logger.exception('{}'.format(line))
         raise be
 
-    log('Successfully created sysroot docker image: {}'.format(image_tag))
+    logger.info('Successfully created sysroot docker image: {}'.format(image_tag))
 
 
 def export_workspace_sysroot_image(image_tag, target_sysroot_path):
-    log('Exporting sysroot to path [{}]'.format(target_sysroot_path))
+    logger.info('Exporting sysroot to path [{}]'.format(target_sysroot_path))
     shutil.rmtree(str(target_sysroot_path), ignore_errors=True)
     tmp_sysroot_dir = tempfile.mkdtemp(suffix='-cc_build')
     sysroot_tarball_path = Path(tmp_sysroot_dir) / (SYSROOT_DIR_NAME + '.tar')
-    log('Exporting filesystem of image {} into tarball {}'.format(
-        image_tag, sysroot_tarball_path))
+    logger.info('Exporting filesystem of image {} into tarball {}'.format(
+                image_tag, sysroot_tarball_path))
     try:
         sysroot_container = DOCKER_CLIENT.containers.run(
             image=image_tag, detach=True)
@@ -203,17 +202,17 @@ def export_workspace_sysroot_image(image_tag, target_sysroot_path):
                                    members=relevant_members)
     finally:
         shutil.rmtree(tmp_sysroot_dir, ignore_errors=True)
-    log('Success exporting sysroot to path [{}]'.format(target_sysroot_path))
+    logger.info('Success exporting sysroot to path [{}]'.format(target_sysroot_path))
 
 
 def write_cc_build_setup_file(platform: Platform, cc_root_dir: Path):
     cc_build_setup_file_path = cc_root_dir / 'cc_build_setup.bash'
     cc_build_setup_file_contents = CC_BUILD_SETUP_FILE_TEMPLATE.render(
-        ros_root='{cc_root_dir}/sysroot/opt/ros/{distro}'.format(
-            cc_root_dir=cc_root_dir, distro=platform.distro),
         target_arch=platform.arch,
         target_triple=platform.cc_toolchain,
-        cc_root=cc_root_dir)
+        cc_root=cc_root_dir,
+        ros_root='{cc_root_dir}/sysroot/opt/ros/{distro}'.format(
+            cc_root_dir=cc_root_dir, distro=platform.distro))
     with open(str(cc_build_setup_file_path), 'w') as out_f:
         out_f.write(cc_build_setup_file_contents)
     return cc_build_setup_file_path
@@ -290,8 +289,9 @@ def create_arg_parser():
         '--ros2-workspace',
         required=False,
         type=str,
-        default='~/ros2_ws',
-        help='The location of your ROS2 workspace. Usually ~/ros2_ws.')
+        default='./ros2_ws',
+        help='The location of the ROS2 workspace you\'ll be cross compiling against. '
+             'Usually ./ros2_ws if you moved it correctly.')
     return parser
 
 
@@ -303,8 +303,7 @@ def main():
     docker_args = DockerConfig(
         args.sysroot_base_image,
         args.docker_network_mode,
-        args.sysroot_nocache,
-        args.ros2_workspace)
+        args.sysroot_nocache)
 
     # Main pipeline
     cc_root_dir = setup_cc_root_dir(platform)
@@ -318,7 +317,7 @@ def main():
     cc_system_setup_script_path = write_cc_system_setup_script(
         cc_root_dir, platform)
 
-    print("""
+    logger.warning("""
 
     In order to complete the cross compilation setup, please
 

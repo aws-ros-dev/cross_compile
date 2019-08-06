@@ -10,7 +10,7 @@ Install these mixins using
 colcon mixin add cc_mixins file://<path_to_mixin_directory>/index.yaml
 colcon mixin update cc_mixins
 ```
-where `cc_mixins` is the name of your
+where `cc_mixins` will be the name of the mixin group (which can be changed). 
 
 Check the mixins are installed by running
 ```bash
