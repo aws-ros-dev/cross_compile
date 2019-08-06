@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -230,6 +231,14 @@ def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform):
     return cc_system_setup_script_path
 
 
+def setup_sysroot_environment(sys_setup_path, build_setup_path):
+    logger.info("Sourcing sysroot environment...")
+    logger.debug("Executing 'bash {}'".format(sys_setup_path))
+    subprocess.run(['bash', sys_setup_path])
+    logger.debug("Executing 'source {}'".format(build_setup_path))
+    subprocess.run(['source', build_setup_path])
+
+
 def create_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -295,6 +304,12 @@ def create_arg_parser():
     return parser
 
 
+def update_pbar(pbar: tqdm, step: int) -> (tqdm, int):
+    step += 1
+    pbar.update(step)
+    return pbar, step
+
+
 def main():
     # Configuration
     parser = create_arg_parser()
@@ -306,31 +321,48 @@ def main():
         args.sysroot_nocache)
 
     # Main pipeline
+    pbar = tqdm(total=9, unit='step')
+    step = 1
+    pbar.update(step)
+
     cc_root_dir = setup_cc_root_dir(platform)
+    pbar, step = update_pbar(pbar, step)
+
     sysroot_dir = setup_sysroot_dir(cc_root_dir, args.force_sysroot_build)
+    pbar, step = update_pbar(pbar, step)
+
     docker_image_tag = get_workspace_image_tag(platform)
+    pbar, step = update_pbar(pbar, step)
+
     build_workspace_sysroot_image(platform, docker_args, docker_image_tag)
+    pbar, step = update_pbar(pbar, step)
+
     export_workspace_sysroot_image(docker_image_tag, sysroot_dir)
+    pbar, step = update_pbar(pbar, step)
+
     cc_build_setup_file_path = write_cc_build_setup_file(platform, cc_root_dir)
+    pbar, step = update_pbar(pbar, step)
+
     # generalization of the Poco hack
     # from https://github.com/ros2/cross_compile/blob/master/entry_point.sh#L38
-    cc_system_setup_script_path = write_cc_system_setup_script(
-        cc_root_dir, platform)
+    cc_system_setup_script_path = write_cc_system_setup_script(cc_root_dir, platform)
+    pbar, step = update_pbar(pbar, step)
+
+    setup_sysroot_environment(cc_system_setup_script_path, cc_build_setup_file_path)
+    pbar, step = update_pbar(pbar, step)
+    pbar.close()
 
     logger.warning("""
-
-    In order to complete the cross compilation setup, please
-
-    1. WORKAROUND: run the command below to setup using sysroot's GLIBC for
-    cross compilation.
-
+    To setup the cross compilation build environment:
+    
+    1. Run the command below to setup using sysroot's GLIBC for cross compilation.
+       
        bash {cc_system_setup_script_path}
 
-    2. Run
+    2. Run the command below to export the environment variables used by the cross 
+    compiled ROS packages.
 
        source {cc_build_setup_file_path}
-
-    to setup the cross compilation build environment
 
     """.format(cc_system_setup_script_path=cc_system_setup_script_path,
                cc_build_setup_file_path=cc_build_setup_file_path))
