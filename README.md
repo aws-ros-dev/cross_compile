@@ -2,11 +2,12 @@
 
 Colcon plugin for cross-compilation
 
-## Usage
+## Install prerequisites
 
-### Install prerequisites
+### Ubuntu
 
-The cross compilation toolchain and docker have to be installed. The following instruction have been tested on Ubuntu Xenial.
+The cross compilation toolchain and docker have to be installed. 
+The following instruction have been tested on Ubuntu Xenial (18.04).
 
 ```bash
 # Install cross compilation toolchain
@@ -26,7 +27,21 @@ newgrp docker # this reloads the group permissions in the current shell, unneces
 docker run hello-world
 ```
 
-Next we need to setup our sysroot directory for the docker image. Docker can only copy from a specific
+### Mac
+The following instruction have been tested on Mac OS Mojave (10.14).
+
+```bash
+# Ensure your brew install is healthy
+brew doctor
+brew install cmake git wget curl bash-completion qemu
+python3 -m pip install --user -U  colcon-common-extensions rosdep vcstool
+```
+
+[Install Docker toolbox](https://docs.docker.com/toolbox/toolbox_install_mac/)
+
+## Usage
+
+We need to setup our sysroot directory for the docker image. Docker can only copy from a specific
 context so all these assets need to be copied relative to the `Dockerfile` path.
 ```bash
 # Create a directory to store qemu assets
@@ -35,6 +50,7 @@ cp /usr/bin/qemu-* $ROS2_WORKSPACE/qemu-user-static
 # Copy ROS Sources
 cp -r ~/ros2_ws/src .
 ```
+
 In the end your Directory should be as follows:
 ```bash
 sysroot
