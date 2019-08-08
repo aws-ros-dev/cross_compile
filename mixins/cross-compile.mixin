@@ -1,0 +1,50 @@
+{
+    "build": {
+        "armhf-generic_linux": {
+            "cmake-args": [
+                "-DCMAKE_SYSTEM_NAME=Linux",
+                "-DCMAKE_SYSTEM_VERSION=1",
+                "-DCMAKE_SYSTEM_PROCESSOR=armv7l",
+                "-DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabihf-gcc",
+                "-DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabihf-g++",
+                "-DCMAKE_SYSROOT=$CC_ROOT/sysroot",
+                "-DCMAKE_FIND_ROOT_PATH=$CC_ROOT/sysroot/root_path:$CC_ROOT/install",
+                "-DCMAKE_INSTALL_RPATH=$CC_ROOT/sysroot/opt/ros/$ROS_DISTRO/lib",
+                "-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=TRUE",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY",
+                "-DPYTHON_SOABI=cpython-36m-arm-linux-gnueabihf",
+                "-DTHREADS_PTHREAD_ARG=0"
+            ],
+            "cmake-clean-cache": true,
+            "cmake-clean-first": true,
+            "cmake-force-configure": true,
+            "merge-install": true
+        },
+        "arm-generic_linux": {
+            "cmake-args": [
+                 "-DCMAKE_SYSTEM_NAME=Linux",
+                "-DCMAKE_SYSTEM_VERSION=1",
+                "-DCMAKE_SYSTEM_PROCESSOR=armv7l",
+                "-DCMAKE_C_COMPILER=/usr/bin/arm-linux-gnueabi-gcc",
+                "-DCMAKE_CXX_COMPILER=/usr/bin/arm-linux-gnueabi-g++",
+                "-DCMAKE_SYSROOT=$CC_ROOT/sysroot",
+                "-DCMAKE_FIND_ROOT_PATH=$CC_ROOT/sysroot/root_path:$CC_ROOT/install",
+                "-DCMAKE_INSTALL_RPATH=$CC_ROOT/sysroot/opt/ros/$ROS_DISTRO/lib",
+                "-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=TRUE",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY",
+                "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY",
+                "-DPYTHON_SOABI=cpython-36m-arm-linux-gnueabi",
+                "-DTHREADS_PTHREAD_ARG=0"
+            ],
+            "cmake-clean-cache": true,
+            "cmake-clean-first": true,
+            "cmake-force-configure": true,
+            "merge-install": true
+        }
+    }
+}

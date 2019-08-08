@@ -13,6 +13,12 @@ ARG ROS_DISTRO
 ARG TARGET_TRIPLE
 
 COPY ${ROS2_WORKSPACE}/qemu-user-static/* /usr/bin/
+
+# Get new security key
+RUN rm -rf /var/lib/apt/lists/*
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+
+RUN apt-get update && apt-get install -y locales
 COPY ${ROS2_WORKSPACE}/ros2_ws/src /ros2_ws/src
 SHELL ["/bin/bash", "-c"]
 

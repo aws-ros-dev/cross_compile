@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.egg-info/
+
+.idea/
+
+build/
+install/
+log/
+qemu-user-static/
+*armhf-*/
+*_armhf-*/
+*_x86-*/
