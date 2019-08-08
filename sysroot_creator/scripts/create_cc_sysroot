@@ -272,7 +272,7 @@ def create_arg_parser():
         required=False,
         type=str,
         help='Base Docker image to use for building the sysroot.'
-             'Ex. juanrh/ros2:armhf_bionic_crystal_fastrtps_prebuilt-crystal')
+             'Ex. ros2/cc-tool:aarch64-bionic-dashing-fastrtps-prebuilt')
     parser.add_argument(
         '--docker-network-mode',
         required=False,

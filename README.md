@@ -72,7 +72,7 @@ pip3 install --editable src/Colcon-cc-build/colcon_cc_build --user
 ## 1. setup the sysroot
 ## add --force-sysroot-build to force rebuilding the sysroot
 colcon cc-setup-sysroot --arch generic_armhf --os ubuntu_bionic \
-   --sysroot-base-image juanrh/ros2:armhf_bionic_crystal_fastrtps_prebuilt-crystal
+   --sysroot-base-image <Dockerfile-base-image>
 ## 2. Complete cc-build setup following the instructions in the output of the previous command
 bash generic_armhf-ubuntu_bionic-fastrtps-crystal/cc_system_setup.bash
 source generic_armhf-ubuntu_bionic-fastrtps-crystal/cc_build_setup.bash
@@ -80,18 +80,27 @@ source generic_armhf-ubuntu_bionic-fastrtps-crystal/cc_build_setup.bash
 colcon cc-build --arch generic_armhf --os ubuntu_bionic \
   --packages-up-to examples_rclcpp_minimal_publisher
 ```
+where `Dockerfile-base-image` is a Dockerfile hosted somewhere or built on your computer.
 
-### Assumptions
+#### Sample Docker images
+
+Prefix all image links with `035662560449.dkr.ecr.us-east-2.amazonaws.com/`.
+
+| Architecture | OS                  | Distro             | DDS      | Image Link                                       |
+|--------------|---------------------|--------------------|----------|--------------------------------------------------|
+| armhf        | Ubuntu Bionic 18.04 | Crystal            | FastRTPS | TODO                                             |
+| aarch64      | Ubuntu Bionic 18.04 | Dashing (Prebuilt) | FastRTPS | cc-tool:aarch64-bionic-dashing-fastrtps-prebuilt |
+| aarch64      | Ubuntu Bionic 18.04 | Dashing            | FastRTPS | TODO                                             |
+
+#### Assumptions
 
 - The Docker image for `--sysroot-base-image` installs the ROS 2 distro at `/opt/ros/${distro}`.
 
 Additional base images can be created using the script `colcon_cc_build/colcon_cc_build/verb/sysroot/publish_to_ECR.sh`.
-Some base images already available to use with `--sysroot-base-image`:
 
-- `juanrh/ros2:armhf_bionic_crystal_fastrtps_prebuilt-crystal` for building ROS 2 packages starting from a prebuilt binary for ROS 2 crystal for armhf.
-- `juanrh/ros2:armhf_bionic_crystal_base-crystal` for building ROS 2 from scratch.
+### Troubleshooting
 
-### Debug
+#### Debug
 
 Manually build and/or run the workspace image
 
@@ -106,7 +115,6 @@ docker image build -f colcon_cc_build/colcon_cc_build/verb/sysroot/Dockerfile_wo
 docker container run -it --rm --network=host --name test ros2_benchmark_pipeline:latest bash
 ```
 
-### Troubleshooting
 
 #### Lib Poco Issue
 From the ROS2 Cross compilation docs:
