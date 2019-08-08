@@ -352,7 +352,7 @@ def main():
     pbar, step = update_pbar(pbar, step)
     pbar.close()
 
-    logger.warning("""
+    logger.info("""
     To setup the cross compilation build environment:
     
     1. Run the command below to setup using sysroot's GLIBC for cross compilation.
