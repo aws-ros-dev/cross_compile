@@ -7,7 +7,8 @@ Colcon plugin for cross-compilation
 ### Ubuntu
 
 The cross compilation toolchain and docker have to be installed. 
-The following instruction have been tested on Ubuntu Xenial (16.04) and Bionic (18.04).
+
+The following instructions have been tested on Ubuntu Xenial (16.04) and Bionic (18.04).
 
 ```bash
 # Install cross compilation toolchain
@@ -28,7 +29,7 @@ docker run hello-world
 ```
 
 ### Mac
-The following instruction have been tested on Mac OS Mojave (10.14).
+The following instructions have been tested on Mac OS Mojave (10.14).
 
 ```bash
 # Ensure your brew install is healthy

@@ -10,4 +10,6 @@ log/
 qemu-user-static/
 *armhf-*/
 *_armhf-*/
+*aarch64-*/
+*_aarch64-*/
 *_x86-*/
