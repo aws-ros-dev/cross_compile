@@ -20,9 +20,10 @@ from tqdm import tqdm
 
 
 CC_BUILD_SETUP_FILE_TEMPLATE = jinja2.Template("""
+shell=`echo $SHELL | awk -F/ '{print $NF}'`
 if [ -d {{ros_root}} ]
 then
-    source {{ros_root}}/setup.bash
+    source {{ros_root}}/setup.$shell
 else
     echo "WARNING: no ROS distro found on the sysroot"
 fi
@@ -38,8 +39,10 @@ sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} /lib/{{target_triple}}
 sudo rm -rf /usr/lib/{{target_triple}}
 sudo ln -s {{cc_root}}/sysroot/usr/lib/{{target_triple}} /usr/lib/{{target_triple}}
 
+sudo cp /usr/{{target_triple}}/lib/ld-*.so* /lib/
+
 CROSS_COMPILER_LIB=/usr/{{target_triple}}/lib
-CROSS_COMPILER_LIB_BAK=$CROSS_COMPILER_LIB_$(date +%s).bak
+CROSS_COMPILER_LIB_BAK=/usr/{{target_triple}}/lib_$(date +%s).bak
 echo "Backing up $CROSS_COMPILER_LIB to $CROSS_COMPILER_LIB_BAK"
 sudo mv $CROSS_COMPILER_LIB $CROSS_COMPILER_LIB_BAK
 sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} $CROSS_COMPILER_LIB
@@ -146,6 +149,7 @@ def build_workspace_sysroot_image(
     try:
         # Switch to low-level API to expose build logs
         docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
+        # Yields a generator with output logs as the build progresses.
         log_generator = docker_client.build(
             path='.',
             dockerfile=str(workspace_dockerfile_path),
@@ -159,15 +163,22 @@ def build_workspace_sysroot_image(
         with tqdm(log_generator) as t:
             for chunk in t:
                 try:
-                    # Remove carriage returns and new lines ('\r\n')
-                    line = chunk['stream'].rstrip().lstrip()
-                    if line == '':
-                        continue
+                    # There are usually two outputs we want to capture, stream and aux.
+                    # All others are generally errors.
+                    # We also want to remove newline (\n) and carriage returns (\r) to
+                    # avoid mangled output.
+                    line = chunk.get('stream', None)
+                    if line is not None:
+                        line = line.rstrip().lstrip()
+                        if line == '':
+                            continue
+                    else:
+                        line = chunk.get('aux', None).rstrip().lstrip()
                     t.set_postfix_str(line)
-                except (KeyError, AttributeError) as e:
+                except KeyError as e:
                     logger.exception("Error reading the Dockerfile image. The following "
                                      "exception was caught:\n{}".format(e))
-                    sys.exit(0)
+                    raise e
     except docker.errors.BuildError as be:
         logger.exception('Error building sysroot image. The following exception was '
                          'caught:\n{}'.format(be.msg))
@@ -232,6 +243,7 @@ def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform):
 
 
 def setup_sysroot_environment(sys_setup_path, build_setup_path):
+    """Setup the environment with variables and symbolic links."""
     logger.info("Sourcing sysroot environment...")
     logger.debug("Executing 'bash {}'".format(sys_setup_path))
     subprocess.run(['bash', sys_setup_path])
@@ -321,6 +333,7 @@ def main():
         args.sysroot_nocache)
 
     # Main pipeline
+    # FIXME: Logging library interferes with tqdm's ability to print clean progress bars.
     pbar = tqdm(total=9, unit='step')
     step = 1
     pbar.update(step)

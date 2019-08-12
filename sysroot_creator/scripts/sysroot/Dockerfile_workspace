@@ -1,52 +1,104 @@
-# This dockerfile takes ROS2 source packages from ./src and builds them for the specified target platform.
-# It uses qemu user-mode static emulation libraries from ./qemu-user-static to emulate the target platform.
+# This dockerfile takes ROS2 source packages from ${ROS2_WORKSPACE}/ros2_ws/src
+# and builds them for the specified target platform.
+# It uses qemu user-mode static emulation libraries from ${ROS2_WORKSPACE}/qemu-user-static/
+# to emulate the target platform.
 
-# Assumptions: ./qemu-user-static and ./src exist and have qemu libraries and ros2 source packages in them respectively.
+# Assumptions: ros2_ws/src and qemu-user-static directories are present in  ${ROS2_WORKSPACE}.
 
 ARG ROS2_BASE_IMG
 FROM ${ROS2_BASE_IMG}
+
 ARG ROS2_WORKSPACE
 ARG ROS_DISTRO
 ARG TARGET_TRIPLE
 
 COPY ${ROS2_WORKSPACE}/qemu-user-static/* /usr/bin/
+
+# Get new security key
 RUN rm -rf /var/lib/apt/lists/*
 RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
-RUN apt-get update && apt-get install -y locales
 
-RUN locale-gen en_US.UTF-8
+RUN apt-get update && apt-get install -y locales
+COPY ${ROS2_WORKSPACE}/ros2_ws/src /ros2_ws/src
+SHELL ["/bin/bash", "-c"]
+
+# Set timezone
+RUN echo 'Etc/UTC' > /etc/timezone && \
+    ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
+    apt-get update && apt-get install -q -y tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set locale
 ENV LANG en_US.UTF-8
 ENV LC_ALL C.UTF-8
 
-RUN apt-get install -y \
-    python3-colcon-common-extensions \
+# Add the ros2 apt repo
+RUN apt update && apt install -y \
+    curl \
+    gnupg2 \
+    lsb-release
+RUN curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add -
+RUN sh -c 'echo "deb [arch=amd64,arm64] http://packages.ros.org/ros2/ubuntu `lsb_release -cs` main" \
+    > /etc/apt/sources.list.d/ros2-latest.list'
+
+# ROS2 dependencies
+RUN apt update && apt install -y \
+    build-essential \
+    cmake \
+    git \
     python3-pip \
-    python3-rosdep \
-    symlinks
+    python-rosdep \
+    wget
 
-COPY ${ROS2_WORKSPACE}/src /opt/workspace/src
+# Install some pip packages needed for testing
+RUN python3 -m pip install -U \
+    argcomplete \
+    colcon-common-extensions \
+    flake8 \
+    flake8-blind-except \
+    flake8-builtins \
+    flake8-class-newline \
+    flake8-comprehensions \
+    flake8-deprecated \
+    flake8-docstrings \
+    flake8-import-order \
+    flake8-quotes \
+    pytest-repeat \
+    pytest-rerunfailures \
+    pytest \
+    pytest-cov \
+    pytest-runner \
+    setuptools \
+    vcstool
 
-WORKDIR /opt/workspace
-RUN rm -f /etc/ros/rosdep/sources.list.d/20-default.list && rosdep init
-RUN rosdep update
-SHELL ["/bin/bash", "-c"]
-# Ensure /opt/ros/${ROS_DISTRO}/share exists to avoid rosdep errors
+# Install Fast-RTPS dependencies
+RUN apt install --no-install-recommends -y \
+    libasio-dev \
+    libtinyxml2-dev
+
+# Setup ROS2 workspace
+WORKDIR /ros2_ws
+RUN mkdir -p /opt/ros/${ROS_DISTRO}/
 RUN mkdir -p /opt/ros/${ROS_DISTRO}/share && touch /opt/ros/${ROS_DISTRO}/setup.bash
-# Ignoring some packages as in https://index.ros.org/doc/ros2/Installation/Crystal/Linux-Install-Binary/#installing-the-missing-dependencies
-RUN source /opt/ros/${ROS_DISTRO}/setup.bash \
-    && rosdep install --from-paths src /opt/ros/${ROS_DISTRO}/share \
+
+# Install rosdep dependencies
+RUN rosdep init
+RUN rosdep update
+RUN rosdep install --from-paths src /opt/ros/${ROS_DISTRO}/share \
     --ignore-src \
-    -v \
     --rosdistro ${ROS_DISTRO} -y \
-    --skip-keys "osrf_testing_tools_cpp poco_vendor tinyxml_vendor tinyxml2_vendor urdfdom  \
-        rmw_connext_cpp rosidl_typesupport_connext_c rosidl_typesupport_connext_cpp rti-connext-dds-5.3.1 \
-        console_bridge \
+    --skip-keys "console_bridge \
         fastcdr \
         fastrtps \
         libopensplice67 \
         libopensplice69 \
         rti-connext-dds-5.3.1 \
         urdfdom_headers"
+
+# Ignore some package that have known errors
+RUN touch \
+    src/ros2/rviz/COLCON_IGNORE \
+    src/ros-visualization/COLCON_IGNORE
 
 # To avoid linker issues when using a compiler with different GLIBC and GLIBCXX
 # root_path/usr should be used as CMAKE_FIND_ROOT_PATH in the toolchain file
@@ -56,4 +108,5 @@ RUN mkdir -p /root_path/usr \
  && cp -r /usr/lib/gcc/${TARGET_TRIPLE}/7/* /root_path/usr/lib
 
 WORKDIR /
+RUN apt install -y symlinks
 RUN symlinks -rc .
