@@ -13,9 +13,8 @@ ARG ROS_DISTRO
 ARG TARGET_TRIPLE
 
 COPY ${ROS2_WORKSPACE}/qemu-user-static/* /usr/bin/
+COPY ${ROS2_WORKSPACE}/src /ros2_ws/src
 
-RUN apt-get update && apt-get install -y locales
-COPY ${ROS2_WORKSPACE}/ros2_ws/src /ros2_ws/src
 SHELL ["/bin/bash", "-c"]
 
 # Set timezone
@@ -25,6 +24,9 @@ RUN echo 'Etc/UTC' > /etc/timezone && \
     rm -rf /var/lib/apt/lists/*
 
 # Set locale
+RUN apt-get update && apt-get install -y locales
+RUN locale-gen en_US en_US.UTF-8 && \
+    update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LC_ALL C.UTF-8
 
