@@ -12,4 +12,6 @@ qemu-user-static/
 src/
 *armhf-*/
 *_armhf-*/
+*aarch64-*/
+*_aarch64-*/
 *_x86-*/

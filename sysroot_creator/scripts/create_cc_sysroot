@@ -9,12 +9,10 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import tarfile
 import tempfile
 
 import docker
-from docker import APIClient
 import jinja2
 from tqdm import tqdm
 
@@ -158,19 +156,22 @@ def build_workspace_sysroot_image(
             nocache=docker_args.nocache,
             network_mode=docker_args.network_mode,
             decode=True)
-        # Progress bar with postfix
-        with tqdm(log_generator) as t:
-            for chunk in t:
-                try:
-                    # Remove carriage returns and new lines ('\r\n')
-                    line = chunk['stream'].rstrip().lstrip()
-                    if line == '':
-                        continue
-                    t.set_postfix_str(line)
-                except (KeyError, AttributeError) as e:
-                    logger.exception("Error reading the Dockerfile image. The following "
-                                     "exception was caught:\n{}".format(e))
-                    sys.exit(0)
+        for chunk in log_generator:
+            # There are usually two outputs we want to capture, stream and aux.
+            # All others are generally errors.
+            # We also want to remove newline (\n) and carriage returns (\r) to
+            # avoid mangled output.
+            try:
+                line = chunk.get('stream', None)
+                if line:
+                    line = line.rstrip().lstrip()
+                    logger.info(line)
+            except KeyError:
+                if chunk.get('error'):
+                    raise docker.errors.BuildError
+                else:
+                    logger.warning("Docker build output: {}".format(chunk))
+
     except docker.errors.BuildError as be:
         logger.exception('Error building sysroot image. The following exception was '
                          'caught:\n{}'.format(be.msg))
@@ -235,11 +236,12 @@ def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform):
 
 
 def setup_sysroot_environment(sys_setup_path, build_setup_path):
+    """Setup the environment with variables and symbolic links."""
     logger.info("Sourcing sysroot environment...")
-    logger.debug("Executing 'bash {}'".format(sys_setup_path))
-    subprocess.run(['bash', sys_setup_path])
-    logger.debug("Executing 'source {}'".format(build_setup_path))
-    subprocess.run(['source', build_setup_path])
+    logger.info("Executing 'bash {}'".format(sys_setup_path))
+    subprocess.run(['bash', str(sys_setup_path)])
+    logger.info("Executing 'source {}'".format(build_setup_path))
+    subprocess.run(['source', str(build_setup_path)], shell=True)
 
 
 def create_arg_parser():
@@ -324,36 +326,24 @@ def main():
         args.sysroot_nocache)
 
     # Main pipeline
-    pbar = tqdm(total=9, unit='step')
-    step = 1
-    pbar.update(step)
-
     cc_root_dir = setup_cc_root_dir(platform)
-    pbar, step = update_pbar(pbar, step)
 
     sysroot_dir = setup_sysroot_dir(cc_root_dir, args.force_sysroot_build)
-    pbar, step = update_pbar(pbar, step)
 
     docker_image_tag = get_workspace_image_tag(platform)
-    pbar, step = update_pbar(pbar, step)
 
     build_workspace_sysroot_image(platform, docker_args, docker_image_tag)
-    pbar, step = update_pbar(pbar, step)
 
     export_workspace_sysroot_image(docker_image_tag, sysroot_dir)
     pbar, step = update_pbar(pbar, step)
 
     cc_build_setup_file_path = write_cc_build_setup_file(platform, cc_root_dir)
-    pbar, step = update_pbar(pbar, step)
 
     # generalization of the Poco hack
     # from https://github.com/ros2/cross_compile/blob/master/entry_point.sh#L38
     cc_system_setup_script_path = write_cc_system_setup_script(cc_root_dir, platform)
-    pbar, step = update_pbar(pbar, step)
 
     setup_sysroot_environment(cc_system_setup_script_path, cc_build_setup_file_path)
-    pbar, step = update_pbar(pbar, step)
-    pbar.close()
 
     logger.info("""
     To setup the cross compilation build environment:
