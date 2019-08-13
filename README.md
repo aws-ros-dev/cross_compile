@@ -45,10 +45,10 @@ We need to setup our sysroot directory for the docker image. Docker can only cop
 context so all these assets need to be copied relative to the `Dockerfile` path.
 ```bash
 # Create a directory to store qemu assets
-mkdir qemu-user-static
-cp /usr/bin/qemu-* $ROS2_WORKSPACE/qemu-user-static 
+mkdir -p sysroot/qemu-user-static
+cp /usr/bin/qemu-* sysroot/qemu-user-static 
 # Copy ROS Sources
-cp -r ~/ros2_ws/src .
+cp -r ~/ros2_ws/src sysroot
 ```
 
 In the end your Directory should be as follows:
@@ -65,22 +65,23 @@ sysroot
 ### Building a workspace
 
 ```bash
-# Install plugin
-pip3 install --editable src/Colcon-cc-build/colcon_cc_build --user
-
 # Launch a build
 ## 1. setup the sysroot
 ## add --force-sysroot-build to force rebuilding the sysroot
-colcon cc-setup-sysroot --arch generic_armhf --os ubuntu_bionic \
-   --sysroot-base-image <Dockerfile-base-image>
-## 2. Complete cc-build setup following the instructions in the output of the previous command
-bash generic_armhf-ubuntu_bionic-fastrtps-crystal/cc_system_setup.bash
-source generic_armhf-ubuntu_bionic-fastrtps-crystal/cc_build_setup.bash
-## 3. launch cross compilation using that sysroot
-colcon cc-build --arch generic_armhf --os ubuntu_bionic \
+python3 create_cc_sysroot.py --arch [armhf|aarch64] --os [ubuntu|debian]
+
+## 2. Install the colcon mixins for cross-compilation
+
+colcon mixin add cc_mixins file://<path_to_cross_compile_repo>/mixins/index.yaml
+colcon mixin update cc_mixins 
+
+### Check the mixins are installed by running
+colcon mixin show
+
+## 3. Launch cross compilation using the sysroot created and colcon mixin for target architecture
+colcon build --mixin [armhf-generic_linux|aarch64-generic_linux]
   --packages-up-to examples_rclcpp_minimal_publisher
 ```
-where `Dockerfile-base-image` is a Dockerfile hosted somewhere or built on your computer.
 
 #### Sample Docker images
 
@@ -95,8 +96,6 @@ Prefix all image links with `035662560449.dkr.ecr.us-east-2.amazonaws.com/`.
 #### Assumptions
 
 - The Docker image for `--sysroot-base-image` installs the ROS 2 distro at `/opt/ros/${distro}`.
-
-Additional base images can be created using the script `colcon_cc_build/colcon_cc_build/verb/sysroot/publish_to_ECR.sh`.
 
 ### Troubleshooting
 
