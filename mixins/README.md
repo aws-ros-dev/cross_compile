@@ -7,7 +7,7 @@ will get linting errors.
 
 Install these mixins using
 ```bash
-colcon mixin add cc_mixins file://<path_to_mixin_directory>/index.yaml
+colcon mixin add cc_mixins file://<path_to_cross_compile_repo>/mixins/index.yaml
 colcon mixin update cc_mixins
 ```
 where `cc_mixins` will be the name of the mixin group (which can be changed). 
