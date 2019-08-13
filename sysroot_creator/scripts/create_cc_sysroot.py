@@ -1,16 +1,32 @@
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Script to generate sysroot for cross-compiling ROS2."""
 
 import argparse
 import logging
 import os
-from pathlib import Path
 import re
 import shutil
 import subprocess
 import tarfile
 import tempfile
+from pathlib import Path
+from typing import Dict
 
 import docker
+
 import jinja2
 
 
@@ -33,8 +49,6 @@ sudo rm -rf /lib/{{target_triple}}
 sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} /lib/{{target_triple}}
 sudo rm -rf /usr/lib/{{target_triple}}
 sudo ln -s {{cc_root}}/sysroot/usr/lib/{{target_triple}} /usr/lib/{{target_triple}}
-
-sudo cp /usr/{{target_triple}}/lib/ld-*.so* /lib/
 
 CROSS_COMPILER_LIB=/usr/{{target_triple}}/lib
 CROSS_COMPILER_LIB_BAK=/usr/{{target_triple}}/lib_$(date +%s).bak
@@ -60,18 +74,21 @@ class Platform:
     4. RMW implementation used
     """
 
-    def __init__(self, arch, os, distro, rmw):
-        self.arch = arch
-        self.os = os
-        self.distro = distro
-        self.rmw = rmw
+    def __init__(self, args):
+        """Initialize platform parameters."""
+        self.arch = args.arch
+        self.os = args.os
+        self.distro = args.distro
+        self.rmw = args.rmw
 
         if self.arch == 'armhf':
             self.cc_toolchain = 'arm-linux-gnueabihf'
         elif self.arch == 'aarch64':
             self.cc_toolchain = 'aarch64-linux-gnu'
 
+    @property
     def __str__(self):
+        """Return string representation of platform parameters."""
         return '-'.join((self.arch, self.os, self.rmw, self.distro))
 
 
@@ -85,33 +102,51 @@ class DockerConfig:
     3. Setting to enable/disable caching during docker build
     """
 
-    def __init__(self, base_image, network_mode, nocache):
-        self.base_image = base_image
-        self.network_mode = network_mode
-        self.nocache = nocache
+    _default_docker_base_image: Dict[tuple, str] = {
+        ('armhf', 'ubuntu'): 'arm32v7/ubuntu:bionic',
+        ('armhf', 'debian'): 'arm32v7/debian:latest',
+        ('aarch64', 'ubuntu'): 'arm64v8/ubuntu:bionic',
+        ('aarch64', 'debian'): 'arm64v8/debian:latest',
+    }
 
+    def __init__(self, args):
+        """Initialize docker configuration."""
+        if args.sysroot_base_image is None:
+            self.base_image = \
+                self._default_docker_base_image[args.arch, args.os]
+        else:
+            self.base_image = args.sysroot_base_image
+
+        self.network_mode = args.docker_network_mode
+        self.nocache = args.sysroot_nocache
+
+    @property
     def __str__(self):
-        return "Base Image: {}\nNetwork Mode: {}\nCaching: {}".format(
+        """Return string representation of docker build parameters."""
+        return 'Base Image: {}\nNetwork Mode: {}\nCaching: {}'.format(
             self.base_image, self.network_mode, self.nocache)
 
 
 def setup_cc_root_dir(platform: Platform) -> Path:
+    """Create cross-compile root directory."""
     if not isinstance(platform, Platform):
-        raise TypeError("Argument `platform` must be of type Platform.")
+        raise TypeError('Argument `platform` must be of type Platform.')
     logger.info('Creating workspace directory...')
-    cc_root = Path.cwd() / str(platform)
+    cc_root = Path.cwd() / platform.__str__
     cc_root.mkdir(parents=True, exist_ok=True)
     (cc_root / 'COLCON_IGNORE').touch()
     return cc_root
 
 
 def setup_sysroot_dir(cc_root_dir: Path, force_sysroot_build: bool) -> Path:
+    """Create sysroot directory."""
     logger.info('Creating sysroot directory...')
     target_sysroot = cc_root_dir / SYSROOT_DIR_NAME
 
     if target_sysroot.exists():
         if not force_sysroot_build:
-            logger.info('Using existing sysroot found at: {}'.format(target_sysroot))
+            logger.info(
+                'Using existing sysroot found at: {}'.format(target_sysroot))
         else:
             logger.info('Sysroot exists - forcing rebuild')
     else:
@@ -122,20 +157,23 @@ def setup_sysroot_dir(cc_root_dir: Path, force_sysroot_build: bool) -> Path:
 
 
 def get_workspace_image_tag(platform: Platform) -> str:
-    return os.getenv('USER') + '/' + platform.__str__() + ':latest'
+    """Generate docker image name and tag."""
+    return os.getenv('USER') + '/' + platform.__str__ + ':latest'
 
 
 def build_workspace_sysroot_image(
         platform: Platform,
         docker_args: DockerConfig,
-        image_tag: str):
+        image_tag: str) -> None:
+    """Build the target sysroot docker image."""
     if not isinstance(platform, Platform):
-        raise TypeError("Argument `platform` must be of type Platform.")
+        raise TypeError('Argument `platform` must be of type Platform.')
     if not isinstance(docker_args, DockerConfig):
-        raise TypeError("Argument `docker_args` must be of type DockerConfig.")
+        raise TypeError('Argument `docker_args` must be of type DockerConfig.')
     if not isinstance(image_tag, str):
-        raise TypeError("Argument `image_tag` must be of type str.")
-    logger.info('Fetching sysroot base image: {}'.format(docker_args.base_image))
+        raise TypeError('Argument `image_tag` must be of type str.')
+    logger.info(
+        'Fetching sysroot base image: {}'.format(docker_args.base_image))
     DOCKER_CLIENT.images.pull(docker_args.base_image)
     # FIXME consider moving constants to static fields
     workspace_dockerfile_path = (Path(__file__).parent / SYSROOT_DIR_NAME /
@@ -175,27 +213,31 @@ def build_workspace_sysroot_image(
                 if chunk.get('error'):
                     raise docker.errors.BuildError
                 else:
-                    logger.warning("Docker build output: {}".format(chunk))
+                    logger.warning('Docker build output: {}'.format(chunk))
 
     except docker.errors.BuildError as be:
-        logger.exception('Error building sysroot image. The following exception was '
-                         'caught:\n{}'.format(be.msg))
+        logger.exception(
+            'Error building sysroot image. The following exception was caught:'
+            '\n{}'.format(be.msg))
         logger.exception('Build log:')
         for stream_obj in be.build_log:
             for line in stream_obj.get('stream', '').split('\n'):
                 logger.exception('{}'.format(line))
         raise be
 
-    logger.info('Successfully created sysroot docker image: {}'.format(image_tag))
+    logger.info(
+        'Successfully created sysroot docker image: {}'.format(image_tag))
 
 
-def export_workspace_sysroot_image(image_tag: str, target_sysroot_path: Path):
+def export_workspace_sysroot_image(
+        image_tag: str, target_sysroot_path: Path) -> None:
+    """Export sysroot filesystem into sysroot directory."""
     logger.info('Exporting sysroot to path [{}]'.format(target_sysroot_path))
     shutil.rmtree(str(target_sysroot_path), ignore_errors=True)
     tmp_sysroot_dir = tempfile.mkdtemp(suffix='-cc_build')
     sysroot_tarball_path = Path(tmp_sysroot_dir) / (SYSROOT_DIR_NAME + '.tar')
     logger.info('Exporting filesystem of image {} into tarball {}'.format(
-                image_tag, sysroot_tarball_path))
+        image_tag, sysroot_tarball_path))
     try:
         sysroot_container = DOCKER_CLIENT.containers.run(
             image=image_tag, detach=True)
@@ -212,10 +254,12 @@ def export_workspace_sysroot_image(image_tag: str, target_sysroot_path: Path):
                                    members=relevant_members)
     finally:
         shutil.rmtree(tmp_sysroot_dir, ignore_errors=True)
-    logger.info('Success exporting sysroot to path [{}]'.format(target_sysroot_path))
+    logger.info(
+        'Success exporting sysroot to path [{}]'.format(target_sysroot_path))
 
 
 def write_cc_build_setup_file(cc_root_dir: Path, platform: Platform) -> Path:
+    """Create setup file for cross-compile build."""
     cc_build_setup_file_path = cc_root_dir / 'cc_build_setup.bash'
     cc_build_setup_file_contents = CC_BUILD_SETUP_FILE_TEMPLATE.render(
         target_arch=platform.arch,
@@ -228,7 +272,9 @@ def write_cc_build_setup_file(cc_root_dir: Path, platform: Platform) -> Path:
     return cc_build_setup_file_path
 
 
-def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform) -> Path:
+def write_cc_system_setup_script(
+        cc_root_dir: Path, platform: Platform) -> Path:
+    """Create setup file for sysroot setup."""
     cc_system_setup_script_path = cc_root_dir / 'cc_system_setup.bash'
     cc_system_setup_script_contents = \
         CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.render(
@@ -240,9 +286,10 @@ def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform) -> Path:
     return cc_system_setup_script_path
 
 
-def setup_sysroot_environment(sys_setup_path: Path, build_setup_path: Path):
-    """Setup the environment with variables and symbolic links."""
-    logger.info("Sourcing sysroot environment...")
+def setup_sysroot_environment(
+        sys_setup_path: Path, build_setup_path: Path) -> None:
+    """Set up the environment with variables and symbolic links."""
+    logger.info('Sourcing sysroot environment...')
     logger.info("Executing 'bash {}'".format(sys_setup_path))
     subprocess.run(['bash', str(sys_setup_path)])
     logger.info("Executing 'source {}'".format(build_setup_path))
@@ -250,6 +297,7 @@ def setup_sysroot_environment(sys_setup_path: Path, build_setup_path: Path):
 
 
 def create_arg_parser():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-a', '--arch',
@@ -288,8 +336,8 @@ def create_arg_parser():
         required=False,
         type=str,
         default='host',
-        help="Docker's network_mode parameter to use for all "
-             'Docker interactions')
+        help="Docker's network_mode parameter to use for all Docker "
+             'interactions')
     parser.add_argument(
         '--sysroot-nocache',
         required=False,
@@ -309,20 +357,18 @@ def create_arg_parser():
         required=False,
         type=str,
         default='./ros2_ws',
-        help='The location of the ROS2 workspace you\'ll be cross compiling against. '
-             'Usually ./ros2_ws if you moved it correctly.')
+        help="The location of the ROS2 workspace you'll be cross compiling "
+             'against. Usually ./ros2_ws if you moved it correctly.')
     return parser
 
 
 def main():
+    """Start the cross-compilation workflow."""
     # Configuration
     parser = create_arg_parser()
     args = parser.parse_args()
-    platform = Platform(args.arch, args.os, args.distro, args.rmw)
-    docker_args = DockerConfig(
-        args.sysroot_base_image,
-        args.docker_network_mode,
-        args.sysroot_nocache)
+    platform = Platform(args)
+    docker_args = DockerConfig(args)
 
     # Main pipeline
     cc_root_dir = setup_cc_root_dir(platform)
@@ -339,20 +385,21 @@ def main():
 
     # generalization of the Poco hack
     # from https://github.com/ros2/cross_compile/blob/master/entry_point.sh#L38
-    cc_system_setup_script_path = write_cc_system_setup_script(cc_root_dir, platform)
+    cc_system_setup_script_path = write_cc_system_setup_script(cc_root_dir,
+                                                               platform)
 
-    setup_sysroot_environment(cc_system_setup_script_path, cc_build_setup_file_path)
+    setup_sysroot_environment(cc_system_setup_script_path,
+                              cc_build_setup_file_path)
 
     logger.info("""
     To setup the cross compilation build environment:
-    
-    1. Run the command below to setup using sysroot's GLIBC for cross compilation.
-       
+
+    1. Run the command below to setup using sysroot's GLIBC for
+    cross-compilation.
        bash {cc_system_setup_script_path}
 
-    2. Run the command below to export the environment variables used by the cross 
-    compiled ROS packages.
-
+    2. Run the command below to export the environment variables used by the
+    cross-compiled ROS packages.
        source {cc_build_setup_file_path}
 
     """.format(cc_system_setup_script_path=cc_system_setup_script_path,
