@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """Script to generate sysroot for cross-compiling ROS2."""
 
 import argparse
@@ -14,7 +12,6 @@ import tempfile
 
 import docker
 import jinja2
-from tqdm import tqdm
 
 
 CC_BUILD_SETUP_FILE_TEMPLATE = jinja2.Template("""
@@ -99,6 +96,8 @@ class DockerConfig:
 
 
 def setup_cc_root_dir(platform: Platform) -> Path:
+    if not isinstance(platform, Platform):
+        raise TypeError("Argument `platform` must be of type Platform.")
     logger.info('Creating workspace directory...')
     cc_root = Path.cwd() / str(platform)
     cc_root.mkdir(parents=True, exist_ok=True)
@@ -130,6 +129,12 @@ def build_workspace_sysroot_image(
         platform: Platform,
         docker_args: DockerConfig,
         image_tag: str):
+    if not isinstance(platform, Platform):
+        raise TypeError("Argument `platform` must be of type Platform.")
+    if not isinstance(docker_args, DockerConfig):
+        raise TypeError("Argument `docker_args` must be of type DockerConfig.")
+    if not isinstance(image_tag, str):
+        raise TypeError("Argument `image_tag` must be of type str.")
     logger.info('Fetching sysroot base image: {}'.format(docker_args.base_image))
     DOCKER_CLIENT.images.pull(docker_args.base_image)
     # FIXME consider moving constants to static fields
@@ -142,8 +147,8 @@ def build_workspace_sysroot_image(
         'ROS_DISTRO': platform.distro,
         'TARGET_TRIPLE': platform.cc_toolchain
     }
-    logger.info('Building workspace image: {}'.format(image_tag))
 
+    logger.info('Building workspace image: {}'.format(image_tag))
     try:
         # Switch to low-level API to expose build logs
         docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
@@ -184,7 +189,7 @@ def build_workspace_sysroot_image(
     logger.info('Successfully created sysroot docker image: {}'.format(image_tag))
 
 
-def export_workspace_sysroot_image(image_tag, target_sysroot_path):
+def export_workspace_sysroot_image(image_tag: str, target_sysroot_path: Path):
     logger.info('Exporting sysroot to path [{}]'.format(target_sysroot_path))
     shutil.rmtree(str(target_sysroot_path), ignore_errors=True)
     tmp_sysroot_dir = tempfile.mkdtemp(suffix='-cc_build')
@@ -210,7 +215,7 @@ def export_workspace_sysroot_image(image_tag, target_sysroot_path):
     logger.info('Success exporting sysroot to path [{}]'.format(target_sysroot_path))
 
 
-def write_cc_build_setup_file(platform: Platform, cc_root_dir: Path):
+def write_cc_build_setup_file(cc_root_dir: Path, platform: Platform) -> Path:
     cc_build_setup_file_path = cc_root_dir / 'cc_build_setup.bash'
     cc_build_setup_file_contents = CC_BUILD_SETUP_FILE_TEMPLATE.render(
         target_arch=platform.arch,
@@ -223,7 +228,7 @@ def write_cc_build_setup_file(platform: Platform, cc_root_dir: Path):
     return cc_build_setup_file_path
 
 
-def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform):
+def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform) -> Path:
     cc_system_setup_script_path = cc_root_dir / 'cc_system_setup.bash'
     cc_system_setup_script_contents = \
         CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.render(
@@ -235,7 +240,7 @@ def write_cc_system_setup_script(cc_root_dir: Path, platform: Platform):
     return cc_system_setup_script_path
 
 
-def setup_sysroot_environment(sys_setup_path, build_setup_path):
+def setup_sysroot_environment(sys_setup_path: Path, build_setup_path: Path):
     """Setup the environment with variables and symbolic links."""
     logger.info("Sourcing sysroot environment...")
     logger.info("Executing 'bash {}'".format(sys_setup_path))
@@ -277,7 +282,7 @@ def create_arg_parser():
         required=False,
         type=str,
         help='Base Docker image to use for building the sysroot.'
-             'Ex. ros2/cc-tool:aarch64-bionic-dashing-fastrtps-prebuilt')
+             'Ex. arm64v8/ubuntu:bionic')
     parser.add_argument(
         '--docker-network-mode',
         required=False,
@@ -309,12 +314,6 @@ def create_arg_parser():
     return parser
 
 
-def update_pbar(pbar: tqdm, step: int) -> (tqdm, int):
-    step += 1
-    pbar.update(step)
-    return pbar, step
-
-
 def main():
     # Configuration
     parser = create_arg_parser()
@@ -335,9 +334,8 @@ def main():
     build_workspace_sysroot_image(platform, docker_args, docker_image_tag)
 
     export_workspace_sysroot_image(docker_image_tag, sysroot_dir)
-    pbar, step = update_pbar(pbar, step)
 
-    cc_build_setup_file_path = write_cc_build_setup_file(platform, cc_root_dir)
+    cc_build_setup_file_path = write_cc_build_setup_file(cc_root_dir, platform)
 
     # generalization of the Poco hack
     # from https://github.com/ros2/cross_compile/blob/master/entry_point.sh#L38

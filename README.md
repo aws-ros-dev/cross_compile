@@ -51,15 +51,16 @@ cp /usr/bin/qemu-* sysroot/qemu-user-static
 cp -r ~/ros2_ws/src sysroot
 ```
 
-In the end your Directory should be as follows:
+In the end your directory should be as follows:
 ```bash
 sysroot
  |
  |-- Dockerfile_workspace
  +-- qemu-user-static
  |   +-- qemu-*-static
- +-- src
-     + -- ros2 packages ...
+ +-- ros2_ws
+     +-- src
+         +-- ros2 packages ...
 ```
 
 ### Building a workspace
