@@ -3,11 +3,13 @@ __pycache__/
 *.egg-info/
 
 .idea/
+.gitignore
 
 build/
 install/
 log/
 qemu-user-static/
+src/
 *armhf-*/
 *_armhf-*/
 *_x86-*/
