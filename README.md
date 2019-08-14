@@ -26,6 +26,9 @@ sudo apt-get install -y docker-ce
 sudo usermod -aG docker $USER
 newgrp docker # this reloads the group permissions in the current shell, unnecessary after relogin
 docker run hello-world
+
+# Install dependencies required by the cross-compile tool
+pip3 install -r sysroot_creator/requirements.txt
 ```
 
 ### Mac
@@ -51,6 +54,28 @@ mkdir qemu-user-static ros2_ws
 cp /usr/bin/qemu-* qemu-user-static 
 # Copy ROS Sources
 cp -r ~/ros2_ws/src ros2_ws
+```
+
+For the current setup,
+```bash
+# Create a directory to store qemu assets
+mkdir -p sysroot_creator/scripts/sysroot/qemu-user-static
+cp -r /usr/bin/qemu-* sysroot_creator/scripts/sysroot/qemu-user-static/
+
+# Get ROS sources (if there is no existing source checkout)
+# release-latest (dashing)
+wget https://raw.githubusercontent.com/ros2/ros2/release-latest/ros2.repos
+# crystal
+wget https://raw.githubusercontent.com/ros2/ros2/crystal/ros2.repos
+
+# Copy ROS Sources
+mkdir -p sysroot_creator/scripts/sysroot/ros2_ws/src
+
+# If there is no existing source checkout
+vcs import sysroot_creator/scripts/sysroot/ros2_ws/src < ros2.repos 
+
+# From an existing workspace
+cp -r ~/ros2_ws sysroot_creator/scripts/sysroot/ros2_ws
 ```
 
 In the end your `sysroot` directory should look like this:

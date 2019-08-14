@@ -232,7 +232,8 @@ def export_workspace_sysroot_image(
             out_f.writelines(sysroot_container.export())
         sysroot_container.stop()
         with tarfile.open(str(sysroot_tarball_path)) as sysroot_tar:
-            relevant_dirs = ['lib', 'usr', 'etc', 'opt', 'root_path', '/ros2_ws/install']
+            relevant_dirs = [
+                'lib', 'usr', 'etc', 'opt', 'root_path', 'ros2_ws/install']
             relevant_members = (
                 m for m in sysroot_tar.getmembers()
                 if re.match('^({}).*'.format('|'.join(relevant_dirs)), m.name)
