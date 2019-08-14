@@ -13,7 +13,7 @@ ARG ROS_DISTRO
 ARG TARGET_TRIPLE
 
 COPY ${ROS2_WORKSPACE}/qemu-user-static/* /usr/bin/
-COPY ${ROS2_WORKSPACE}/src /ros2_ws/src
+COPY ${ROS2_WORKSPACE}/ros2_ws/src /ros2_ws/src
 
 SHELL ["/bin/bash", "-c"]
 
@@ -52,6 +52,7 @@ RUN apt update && apt install -y \
 RUN python3 -m pip install -U \
     argcomplete \
     colcon-common-extensions \
+    colcon-mixin \
     flake8 \
     flake8-blind-except \
     flake8-builtins \

@@ -29,9 +29,8 @@ colcon-zsh==0.3.2
 coverage==4.5.4
 distlib==0.2.9.post0
 docker==4.0.2
-docutils==0.15.1
 empy==3.3.4
-gcc-aarch64-linux-gnu==7.4.0
+flake8==3.7.8
 idna==2.8
 importlib-metadata==0.19
 Jinja2==2.10.1

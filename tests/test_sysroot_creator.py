@@ -20,17 +20,16 @@ import shutil
 from glob import glob
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict
 
 import docker
 import pytest
 
+from sysroot_creator.scripts.create_cc_sysroot import DockerConfig
+from sysroot_creator.scripts.create_cc_sysroot import Platform
 from sysroot_creator.scripts.create_cc_sysroot import \
     build_workspace_sysroot_image, export_workspace_sysroot_image, \
     get_workspace_image_tag, setup_cc_root_dir, setup_sysroot_dir, \
     write_cc_build_setup_file, write_cc_system_setup_script
-from sysroot_creator.scripts.create_cc_sysroot import DockerConfig
-from sysroot_creator.scripts.create_cc_sysroot import Platform
 
 
 def _default_args() -> SimpleNamespace:
@@ -81,7 +80,7 @@ def test_setup_cc_root_dir(platform_config):
     assert colcon_ignore.exists() is True
 
 
-def test_setup_cc_root_dir_bad_input(request):
+def test_setup_cc_root_dir_bad_input():
     """Make sure errors are raised on bad input."""
     with pytest.raises(TypeError):
         setup_cc_root_dir(None)
@@ -129,7 +128,7 @@ def test_build_workspace_sysroot_image(platform_config, docker_config):
 
 
 def test_build_workspace_sysroot_image_bad_input(
-        request, platform_config, docker_config):
+        platform_config, docker_config):
     """Make sure errors are raised on bad input."""
     image_tag = '{}/{}:latest'.format(
         os.getenv('USER'), platform_config.__str__)
@@ -171,7 +170,7 @@ def test_write_cc_build_setup_file(platform_config):
     assert build_setup_file_path.exists() is True
 
 
-def test_write_cc_system_setup_script(request, platform_config):
+def test_write_cc_system_setup_script(platform_config):
     """Check if the system setup file was written to directory."""
     cc_root_dir = Path.cwd() / platform_config.__str__
     system_setup_script_path = write_cc_system_setup_script(
