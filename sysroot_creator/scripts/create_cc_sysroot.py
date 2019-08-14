@@ -187,43 +187,30 @@ def build_workspace_sysroot_image(
     }
 
     logger.info('Building workspace image: {}'.format(image_tag))
-    try:
-        # Switch to low-level API to expose build logs
-        docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
-        log_generator = docker_client.build(
-            path='.',
-            dockerfile=str(workspace_dockerfile_path),
-            tag=image_tag,
-            buildargs=buildargs,
-            quiet=False,
-            nocache=docker_args.nocache,
-            network_mode=docker_args.network_mode,
-            decode=True)
-        for chunk in log_generator:
-            # There are usually two outputs we want to capture, stream and aux.
-            # All others are generally errors.
-            # We also want to remove newline (\n) and carriage returns (\r) to
-            # avoid mangled output.
-            try:
-                line = chunk.get('stream', None)
-                if line:
-                    line = line.rstrip().lstrip()
-                    logger.info(line)
-            except KeyError:
-                if chunk.get('error'):
-                    raise docker.errors.BuildError
-                else:
-                    logger.warning('Docker build output: {}'.format(chunk))
-
-    except docker.errors.BuildError as be:
-        logger.exception(
-            'Error building sysroot image. The following exception was caught:'
-            '\n{}'.format(be.msg))
-        logger.exception('Build log:')
-        for stream_obj in be.build_log:
-            for line in stream_obj.get('stream', '').split('\n'):
-                logger.exception('{}'.format(line))
-        raise be
+    # Switch to low-level API to expose build logs
+    docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
+    log_generator = docker_client.build(
+        path='.',
+        dockerfile=str(workspace_dockerfile_path),
+        tag=image_tag,
+        buildargs=buildargs,
+        quiet=False,
+        nocache=docker_args.nocache,
+        network_mode=docker_args.network_mode,
+        decode=True)
+    for chunk in log_generator:
+        # There are usually two outputs we want to capture, stream and error.
+        # We also want to remove newline (\n) and carriage returns (\r) to
+        # avoid mangled output.
+        error_line = chunk.get('error', None)
+        if error_line:
+            logger.exception('Error building sysroot image. The following error'
+                             'was caught:\n{}'.format(error_line))
+            raise docker.errors.BuildError(reason=error_line, build_log=error_line)
+        line = chunk.get('stream', '')
+        line = line.rstrip().lstrip()
+        if line:
+            logger.info(line)
 
     logger.info(
         'Successfully created sysroot docker image: {}'.format(image_tag))
@@ -298,7 +285,17 @@ def setup_sysroot_environment(
 
 def create_arg_parser():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser()
+    example_text = '''Example usage:
+    
+    python3 create_cc_sysroot.py --arch armhf --os debian
+    python3 create_cc_sysroot.py --arch aarch64 --os ubuntu
+    python3 create_cc_sysroot.py -a armhf -o ubuntu -d dashing -r fastrtps \
+--sysroot-base-image arm64v8/ubuntu:bionic
+    '''
+    parser = argparse.ArgumentParser(
+        description='Sysroot creator for cross compilation workflows.',
+        epilog=example_text,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         '-a', '--arch',
         required=True,
@@ -323,13 +320,13 @@ def create_arg_parser():
         required=False,
         type=str,
         default='fastrtps',
-        choices=['fatrtps', 'opensplice', 'connext'],
+        choices=['fastrtps', 'opensplice', 'connext'],
         help='Target RMW implementation')
     parser.add_argument(
         '--sysroot-base-image',
         required=False,
         type=str,
-        help='Base Docker image to use for building the sysroot.'
+        help='Base Docker image to use for building the sysroot. '
              'Ex. arm64v8/ubuntu:bionic')
     parser.add_argument(
         '--docker-network-mode',
@@ -394,12 +391,12 @@ def main():
     logger.info("""
     To setup the cross compilation build environment:
 
-    1. Run the command below to setup using sysroot's GLIBC for
-    cross-compilation.
+    1. Run the command below to setup using sysroot's GLIBC for \
+cross-compilation.
        bash {cc_system_setup_script_path}
 
-    2. Run the command below to export the environment variables used by the
-    cross-compiled ROS packages.
+    2. Run the command below to export the environment variables used by the \
+cross-compiled ROS packages.
        source {cc_build_setup_file_path}
 
     """.format(cc_system_setup_script_path=cc_system_setup_script_path,

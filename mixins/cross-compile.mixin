@@ -42,7 +42,7 @@
                 "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY",
                 "-DPYTHON_SOABI=cpython-36m-arm-linux-gnueabi",
                 "-DTHREADS_PTHREAD_ARG=0",
-                --no-warn-unused-cli
+                "--no-warn-unused-cli"
             ],
             "cmake-clean-cache": true,
             "cmake-clean-first": true,
@@ -68,7 +68,7 @@
                 "-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY",
                 "-DPYTHON_SOABI=cpython-36m-arm-linux-gnueabihf",
                 "-DTHREADS_PTHREAD_ARG=0",
-                --no-warn-unused-cli
+                "--no-warn-unused-cli"
             ],
             "cmake-clean-cache": true,
             "cmake-clean-first": true,

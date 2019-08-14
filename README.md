@@ -12,7 +12,8 @@ The following instructions have been tested on Ubuntu Xenial (16.04) and Bionic 
 ```bash
 # Install cross compilation toolchain
 sudo apt-get update
-sudo apt-get install -y build-essential cmake git wget curl lsb-core bash-completion qemu-user-static g++-aarch64-linux-gnu g++-arm-linux-gnueabihf python3-pip htop
+sudo apt-get install -y build-essential cmake git wget curl lsb-core bash-completion \
+    qemu-user-static g++-aarch64-linux-gnu g++-arm-linux-gnueabihf python3-pip htop
 sudo python3 -m pip install -U  colcon-common-extensions rosdep vcstool
 
 # Also install docker and make it available to the current user: https://docs.docker.com/install/linux/docker-ce/ubuntu/
@@ -44,23 +45,24 @@ python3 -m pip install --user -U  colcon-common-extensions rosdep vcstool
 We need to setup our sysroot directory for the docker image. Docker can only copy from a specific
 context so all these assets need to be copied relative to the `Dockerfile` path.
 ```bash
-# Create a directory to store qemu assets
-mkdir -p sysroot/qemu-user-static
-cp /usr/bin/qemu-* sysroot/qemu-user-static 
+cd /path/to/sysroot
+# Create a directory to store ROS/qemu assets
+mkdir qemu-user-static ros2_ws
+cp /usr/bin/qemu-* qemu-user-static 
 # Copy ROS Sources
-cp -r ~/ros2_ws/src sysroot
+cp -r ~/ros2_ws/src ros2_ws
 ```
 
-In the end your directory should be as follows:
+In the end your `sysroot` directory should look like this:
 ```bash
 sysroot
- |
  |-- Dockerfile_workspace
  +-- qemu-user-static
  |   +-- qemu-*-static
  +-- ros2_ws
      +-- src
-         +-- ros2 packages ...
+          |-- (ros2 packages) 
+          +-- ...
 ```
 
 ### Building a workspace
