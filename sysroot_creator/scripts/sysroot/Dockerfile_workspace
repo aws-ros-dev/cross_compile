@@ -99,6 +99,8 @@ RUN touch \
     src/ros2/rviz/COLCON_IGNORE \
     src/ros-visualization/COLCON_IGNORE
 
+RUN colcon build --merge-install --cmake-force-configure
+
 # To avoid linker issues when using a compiler with different GLIBC and GLIBCXX
 # root_path/usr should be used as CMAKE_FIND_ROOT_PATH in the toolchain file
 RUN mkdir -p /root_path/usr \
