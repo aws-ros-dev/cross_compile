@@ -1,5 +1,11 @@
 {
     "build": {
+        "aarch64-docker": {
+            "cmake-clean-cache": true,
+            "cmake-clean-first": true,
+            "cmake-force-configure": true,
+            "merge-install": true
+        },
         "aarch64-linux": {
             "cmake-args": [
                 "-DCMAKE_SYSTEM_NAME=Linux",
@@ -48,6 +54,23 @@
             "cmake-clean-first": true,
             "cmake-force-configure": true,
             "merge-install": true
+        },
+        "armhf-docker": {
+            "cmake-args": [
+                "-DCMAKE_C_FLAGS=-Wno-psabi",
+                "-DCMAKE_CXX_FLAGS=-Wno-psabi",
+                "--no-warn-unused-cli"
+            ],
+            "cmake-clean-cache": true,
+            "cmake-clean-first": true,
+            "cmake-force-configure": true,
+            "merge-install": true,
+            "packages-skip": [
+                "rosbag2",
+                "rosbag2_transport",
+                "rosbag2_converter_default_plugins",
+                "ros2bag",
+                "rosbag2_tests"]
         },
         "armhf-linux": {
             "cmake-args": [
