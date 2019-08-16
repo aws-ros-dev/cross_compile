@@ -183,7 +183,8 @@ def build_workspace_sysroot_image(
         'ROS2_BASE_IMG': docker_args.base_image,
         'ROS2_WORKSPACE': './' + SYSROOT_DIR_NAME,
         'ROS_DISTRO': platform.distro,
-        'TARGET_TRIPLE': platform.cc_toolchain
+        'TARGET_TRIPLE': platform.cc_toolchain,
+        'TARGET_ARCH': platform.arch,
     }
 
     logger.info('Building workspace image: {}'.format(image_tag))
