@@ -15,3 +15,5 @@ src/
 *aarch64-*/
 *_aarch64-*/
 *_x86-*/
+
+.DS_Store
