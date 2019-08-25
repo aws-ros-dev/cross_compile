@@ -92,34 +92,30 @@ sysroot
 
 ### Building a workspace
 
+1. Setup the sysroot
+
+Add --force-sysroot-build to force rebuilding the sysroot
 ```bash
-# Launch a build
-## 1. setup the sysroot
-## add --force-sysroot-build to force rebuilding the sysroot
 python3 create_cc_sysroot.py --arch [armhf|aarch64] --os [ubuntu|debian]
-
-## 2. Install the colcon mixins for cross-compilation
-
+```
+2. Install the colcon mixins for cross-compilation
+```bash
 colcon mixin add cc_mixins file://<path_to_cross_compile_repo>/mixins/index.yaml
 colcon mixin update cc_mixins 
-
-### Check the mixins are installed by running
+# Check the mixins are installed by running
 colcon mixin show
-
-## 3. Launch cross compilation using the sysroot created and colcon mixin for target architecture
+```
+3. Launch cross compilation using the sysroot created and colcon mixin for target architecture
+```bash
 colcon build --mixin [armhf-generic_linux|aarch64-generic_linux]
   --packages-up-to examples_rclcpp_minimal_publisher
 ```
 
 #### Sample Docker images
 
-Prefix all image links with `035662560449.dkr.ecr.us-east-2.amazonaws.com/`.
+You can use the [Official Dockerhub ROS Repo](https://hub.docker.com/_/ros) to find base images.
 
-| Architecture | OS                  | Distro             | DDS      | Image Link                                       |
-|--------------|---------------------|--------------------|----------|--------------------------------------------------|
-| armhf        | Ubuntu Bionic 18.04 | Crystal            | FastRTPS | TODO                                             |
-| aarch64      | Ubuntu Bionic 18.04 | Dashing (Prebuilt) | FastRTPS | cc-tool:aarch64-bionic-dashing-fastrtps-prebuilt |
-| aarch64      | Ubuntu Bionic 18.04 | Dashing            | FastRTPS | TODO                                             |
+You can also use [OSRF's Dockerhub Repo](https://hub.docker.com/r/osrf/ros2) to obtain images as well.
 
 #### Assumptions
 
@@ -129,13 +125,13 @@ Prefix all image links with `035662560449.dkr.ecr.us-east-2.amazonaws.com/`.
 
 #### Debug
 
-Manually build and/or run the workspace image
+To manually build and/or run the workspace image
 
 ```bash
 docker image build -f colcon_cc_build/colcon_cc_build/verb/sysroot/Dockerfile_workspace \
   --network host \
   -t ros2_benchmark_pipeline:latest \
-  --build-arg ROS2_BASE_IMG=913674827342.dkr.ecr.us-west-2.amazonaws.com/ros2:ubuntu_arm-crystal \
+  --build-arg ROS2_BASE_IMG=<your-base-image> \
   --build-arg ROS2_WORKSPACE=. --build-arg ROS_DISTRO=crystal --build-arg TARGET_TRIPLE=aarch64-linux-gnu \
   .
 
