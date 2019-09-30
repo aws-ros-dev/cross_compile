@@ -206,7 +206,7 @@ def build_workspace_sysroot_image(
         error_line = chunk.get('error', None)
         if error_line:
             logger.exception('Error building sysroot image. The following error'
-                             'was caught:\n{}'.format(error_line))
+                             ' was caught:\n{}'.format(error_line))
             raise docker.errors.BuildError(reason=error_line, build_log=error_line)
         line = chunk.get('stream', '')
         line = line.rstrip().lstrip()
