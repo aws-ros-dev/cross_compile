@@ -28,7 +28,7 @@ newgrp docker # this reloads the group permissions in the current shell, unneces
 docker run hello-world
 
 # Install dependencies required by the cross-compile tool
-pip3 install -r sysroot_creator/requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### Mac
