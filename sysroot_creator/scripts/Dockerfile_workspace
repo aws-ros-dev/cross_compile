@@ -8,15 +8,14 @@
 ARG ROS2_BASE_IMG
 FROM ${ROS2_BASE_IMG}
 
+ARG CC_WORKSPACE
 ARG ROS2_WORKSPACE
 ARG ROS_DISTRO
 ARG TARGET_TRIPLE
 ARG TARGET_ARCH
 
-COPY ${ROS2_WORKSPACE}/qemu-user-static/* /usr/bin/
-COPY ${ROS2_WORKSPACE}/ros2_ws/src /ros2_ws/src
-
-SHELL ["/bin/bash", "-c"]
+COPY ${CC_WORKSPACE}/qemu-user-static/ /usr/bin/
+COPY ${CC_WORKSPACE}/${ROS2_WORKSPACE}/src /ros2_ws/src
 
 # Set timezone
 RUN echo 'Etc/UTC' > /etc/timezone && \
