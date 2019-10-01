@@ -138,7 +138,6 @@ class DockerConfig:
         self.network_mode = args.docker_network_mode
         self.nocache = args.sysroot_nocache
 
-    @property
     def __str__(self):
         """Return string representation of docker build parameters."""
         return 'Base Image: {}\nNetwork Mode: {}\nCaching: {}'.format(
@@ -164,6 +163,15 @@ class SysrootCreator:
         :param docker_config: A custom object used to specify the configuration of the Docker
         image to build.
         """
+        if not isinstance(cc_root_dir, str):
+            raise TypeError("Argument `cc_root_dir` must be of type string.")
+        if not isinstance(ros_workspace_dir, str):
+            raise TypeError("Argument `ros_workspace_dir` must be of type string.")
+        if not isinstance(platform, Platform):
+            raise TypeError("Argument `platform` must be of type Platform.")
+        if not isinstance(docker_config, DockerConfig):
+            raise TypeError("Argument `docker_config` must be of type DockerConfig.")
+
         self._cc_root_dir = Path(cc_root_dir)
         self._ros_workspace_dir = Path(ros_workspace_dir)
         self._target_sysroot = self._cc_root_dir / SYSROOT_DIR_NAME
