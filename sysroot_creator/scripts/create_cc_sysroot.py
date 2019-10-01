@@ -24,7 +24,6 @@ from string import Template
 import subprocess
 import tarfile
 import tempfile
-from typing import Optional
 from typing import Dict
 
 import docker
@@ -106,6 +105,10 @@ class Platform:
         """Return string representation of platform parameters."""
         return '-'.join((self.arch, self.os, self.rmw, self.distro))
 
+    def get_workspace_image_tag(self) -> str:
+        """Generate docker image name and tag."""
+        return os.getenv('USER') + '/' + str(self) + ':latest'
+
 
 class DockerConfig:
     """
@@ -142,184 +145,185 @@ class DockerConfig:
             self.base_image, self.network_mode, self.nocache)
 
 
-def setup_cc_root_dir(
-  platform: Platform,
-  sysroot_directory: Optional[str]) -> Path:
-    """Create cross-compile root directory."""
-    # TODO: Remove as not necessary given sysroot path is now passed.
-    if not isinstance(platform, Platform):
-        raise TypeError('Argument `platform` must be of type Platform.')
+class SysrootCreator:
+    """A class that configures and builds a Docker container for cross-compiling ROS2 packages."""
+    def __init__(
+      self,
+      cc_root_dir: str,
+      ros_workspace_dir: str,
+      platform: Platform,
+      docker_config: DockerConfig) -> None:
+        """
+        Construct a SysrootCreator object the builds a Docker container used for cross compilation.
 
-    logger.info('Creating cross-compile directory...')
-    cc_root = Path.cwd() if sysroot_directory is None else Path(sysroot_directory)
-    cc_root = cc_root / str(platform)
-    cc_root.mkdir(parents=True, exist_ok=True)
-    (cc_root / 'COLCON_IGNORE').touch()
-    logger.info('Cross-compile directory generated in: {}'.format(cc_root))
-    return cc_root
+        :param cc_root_dir: The directory containing the 'sysroot' directory with the ROS2
+        workspace and QEMU binaries.
+        :param ros_workspace_dir: The name of the directory containing the ROS2 packages (inside a
+        'src' directory).
+        :param platform: A custom object used to specify the the platform for cross-compilation.
+        :param docker_config: A custom object used to specify the configuration of the Docker
+        image to build.
+        """
+        self._cc_root_dir = Path(cc_root_dir)
+        self._ros_workspace_dir = Path(ros_workspace_dir)
+        self._target_sysroot = self._cc_root_dir / SYSROOT_DIR_NAME
+        self._ros_ws_directory = self._target_sysroot / self._ros_workspace_dir
+        self._qemu_directory = self._target_sysroot / QEMU_DIR_NAME
+        self._dockerfile_directory = Path(__file__).parent / DOCKER_WS_NAME
+        self._expected_dockerfile_directory = self._target_sysroot / DOCKER_WS_NAME
+        self._system_setup_script_path = Path()
+        self._build_setup_script_path = Path()
+        self._platform = platform
+        self._docker_config = docker_config
 
+        try:
+            self._setup_sysroot_dir()
+        except FileNotFoundError as e:
+            logger.exception(e)
 
-def setup_sysroot_dir(
-  cc_root_dir: Path,
-  ros_workspace: str) -> Path:
-    """Create sysroot directory."""
-    target_sysroot = cc_root_dir / SYSROOT_DIR_NAME
-    ros_ws_directory = target_sysroot / ros_workspace
-    qemu_directory = target_sysroot / QEMU_DIR_NAME
-    dockerfile_directory = Path(__file__).parent / DOCKER_WS_NAME
-    expected_dockerfile_directory = target_sysroot / DOCKER_WS_NAME
+    def get_system_setup_script_path(self) -> Path:
+        """Returns the path to the system setup script."""
+        return self._system_setup_script_path
 
-    logger.info('Checking sysroot directory...')
-    if target_sysroot.exists():
-        logger.debug('Sysroot directory exists.')
-        if not ros_ws_directory.exists():
-            raise FileNotFoundError(ROS_WS_DIR_ERROR_STRING.substitute(ros_ws=ros_workspace))
-        logger.debug('ROS workspace exists.')
-        if not qemu_directory.exists():
-            raise FileNotFoundError(QEMU_DIR_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
-        if not os.listdir(str(qemu_directory.absolute())):
-            raise FileNotFoundError(QEMU_EMPTY_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
-        logger.debug('QEMU binaries exist')
-        shutil.copy(str(dockerfile_directory), str(target_sysroot))
-        if not expected_dockerfile_directory.exists():
-            raise FileNotFoundError(COPY_DOCKER_WS_ERROR_STRING.substitute(
-                dockerfile=DOCKER_WS_NAME))
-    else:
-        raise FileNotFoundError(SYSROOT_NOT_FOUND_ERROR_STRING.substitute(sysroot_dir=cc_root_dir))
+    def get_build_setup_script_path(self) -> Path:
+        """Returns the path to the build setup script."""
+        return self._build_setup_script_path
 
-    return target_sysroot
+    def _setup_sysroot_dir(self) -> None:
+        """Checks to make sure the sysroot directory is setup correctly.
 
+        Raises FileNotFoundError's if any of the components necessary for cross compilation is
+        missing. Copies the Dockerfile_workspace to the 'sysroot' directory in order to copy the
+        assets to it (see https://docs.docker.com/engine/reference/builder/#copy).
+        """
+        logger.info('Checking sysroot directory...')
+        if self._target_sysroot.exists():
+            logger.debug('Sysroot directory exists.')
+            if not self._ros_ws_directory.exists():
+                raise FileNotFoundError(ROS_WS_DIR_ERROR_STRING.substitute(
+                    ros_ws=self._ros_workspace_dir))
+            logger.debug('ROS workspace exists.')
+            if not self._qemu_directory.exists():
+                raise FileNotFoundError(QEMU_DIR_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
+            if not os.listdir(str(self._qemu_directory.absolute())):
+                raise FileNotFoundError(QEMU_EMPTY_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
+            logger.debug('QEMU binaries exist')
+            shutil.copy(str(self._dockerfile_directory), str(self._target_sysroot))
+            if not self._expected_dockerfile_directory.exists():
+                raise FileNotFoundError(COPY_DOCKER_WS_ERROR_STRING.substitute(
+                    dockerfile=DOCKER_WS_NAME))
+        else:
+            raise FileNotFoundError(SYSROOT_NOT_FOUND_ERROR_STRING.substitute(
+                sysroot_dir=self._cc_root_dir))
 
-def get_workspace_image_tag(platform: Platform) -> str:
-    """Generate docker image name and tag."""
-    return os.getenv('USER') + '/' + str(platform) + ':latest'
+    def build_workspace_sysroot_image(self) -> None:
+        """Build the target sysroot docker image."""
+        logger.info('Fetching sysroot base image: {}'.format(self._docker_config.base_image))
+        DOCKER_CLIENT.images.pull(self._docker_config.base_image)
+        image_tag = self._platform.get_workspace_image_tag()
+        buildargs = {
+            'ROS2_BASE_IMG': self._docker_config.base_image,
+            'ROS2_WORKSPACE': str(self._ros_workspace_dir),
+            'ROS_DISTRO': self._platform.distro,
+            'TARGET_TRIPLE': self._platform.cc_toolchain,
+            'TARGET_ARCH': self._platform.arch,
+        }
+        logger.debug("Build Arguments: {}")
+        logger.info('Building workspace image: {}'.format(image_tag))
 
+        # Switch to low-level API to expose build logs
+        docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
+        # Note the difference:
+        # path – Path to the directory containing the Dockerfile
+        # dockerfile – Path within the build context to the Dockerfile
+        log_generator = docker_client.build(
+            path=str(self._target_sysroot),
+            dockerfile=str(self._expected_dockerfile_directory),
+            tag=image_tag,
+            buildargs=buildargs,
+            quiet=False,
+            nocache=self._docker_config.nocache,
+            network_mode=self._docker_config.network_mode,
+            decode=True)
+        for chunk in log_generator:
+            # There are usually two outputs we want to capture, stream and error.
+            # We also want to remove newline (\n) and carriage returns (\r) to
+            # avoid mangled output.
+            error_line = chunk.get('error', None)
+            if error_line:
+                logger.exception('Error building sysroot image. The following error'
+                                 ' was caught:\n{}'.format(error_line))
+                raise docker.errors.BuildError(reason=error_line, build_log=error_line)
+            line = chunk.get('stream', '')
+            line = line.rstrip().lstrip()
+            if line:
+                logger.info(line)
 
-def build_workspace_sysroot_image(
-  platform: Platform,
-  docker_args: DockerConfig,
-  image_tag: str,
-  sysroot_directory: Path,
-  ros_workspace: str) -> None:
-    """Build the target sysroot docker image."""
-    if not isinstance(platform, Platform):
-        raise TypeError('Argument `platform` must be of type Platform.')
-    if not isinstance(docker_args, DockerConfig):
-        raise TypeError('Argument `docker_args` must be of type DockerConfig.')
-    if not isinstance(image_tag, str):
-        raise TypeError('Argument `image_tag` must be of type str.')
-    logger.info('Fetching sysroot base image: {}'.format(docker_args.base_image))
-    DOCKER_CLIENT.images.pull(docker_args.base_image)
-    workspace_dockerfile_path = (sysroot_directory / DOCKER_WS_NAME)
+        logger.info('Successfully created sysroot docker image: {}'.format(image_tag))
 
-    buildargs = {
-        'ROS2_BASE_IMG': docker_args.base_image,
-        'CC_WORKSPACE': '.',
-        'ROS2_WORKSPACE': ros_workspace,
-        'ROS_DISTRO': platform.distro,
-        'TARGET_TRIPLE': platform.cc_toolchain,
-        'TARGET_ARCH': platform.arch,
-    }
-    logger.debug("Build Arguments: {}")
+    def export_workspace_sysroot_image(self) -> None:
+        """Export sysroot filesystem into sysroot directory."""
+        logger.info('Exporting sysroot to path [{}]'.format(self._target_sysroot))
+        shutil.rmtree(str(self._target_sysroot), ignore_errors=True)
+        # TODO: Use context to make sure temp directory doesn't leak
+        tmp_sysroot_dir = tempfile.mkdtemp(suffix='-cc_build')
+        sysroot_tarball_path = Path(tmp_sysroot_dir) / (SYSROOT_DIR_NAME + '.tar')
+        image_tag = self._platform.get_workspace_image_tag()
+        logger.info('Exporting filesystem of image {} into tarball {}'.format(
+            image_tag, sysroot_tarball_path))
 
-    logger.info('Building workspace image: {}'.format(image_tag))
-    # Switch to low-level API to expose build logs
-    docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
-    # Note the difference:
-    # path – Path to the directory containing the Dockerfile
-    # dockerfile – Path within the build context to the Dockerfile
-    log_generator = docker_client.build(
-        path=str(sysroot_directory),
-        dockerfile=str(workspace_dockerfile_path),
-        tag=image_tag,
-        buildargs=buildargs,
-        quiet=False,
-        nocache=docker_args.nocache,
-        network_mode=docker_args.network_mode,
-        decode=True)
-    for chunk in log_generator:
-        # There are usually two outputs we want to capture, stream and error.
-        # We also want to remove newline (\n) and carriage returns (\r) to
-        # avoid mangled output.
-        error_line = chunk.get('error', None)
-        if error_line:
-            logger.exception('Error building sysroot image. The following error'
-                             ' was caught:\n{}'.format(error_line))
-            raise docker.errors.BuildError(reason=error_line, build_log=error_line)
-        line = chunk.get('stream', '')
-        line = line.rstrip().lstrip()
-        if line:
-            logger.info(line)
+        try:
+            sysroot_container = DOCKER_CLIENT.containers.run(image=image_tag, detach=True)
+            with open(str(sysroot_tarball_path), 'wb') as out_f:
+                out_f.writelines(sysroot_container.export())
+            sysroot_container.stop()
+            with tarfile.open(str(sysroot_tarball_path)) as sysroot_tar:
+                relevant_dirs = ['lib', 'usr', 'etc', 'opt', 'root_path', 'ros2_ws/install']
+                relevant_members = (
+                    m for m in sysroot_tar.getmembers()
+                    if re.match('^({}).*'.format('|'.join(relevant_dirs)), m.name) is not None
+                )
+                sysroot_tar.extractall(str(self._target_sysroot), members=relevant_members)
+        finally:
+            shutil.rmtree(tmp_sysroot_dir, ignore_errors=True)
 
-    logger.info(
-        'Successfully created sysroot docker image: {}'.format(image_tag))
+        logger.info('Success exporting sysroot to path [{}]'.format(self._target_sysroot))
 
+    def _write_cc_build_setup_script(self) -> Path:
+        """Create setup file for cross-compile build."""
+        cc_build_setup_file_path = self._target_sysroot / 'cc_build_setup.bash'
+        cc_build_setup_file_contents = CC_BUILD_SETUP_FILE_TEMPLATE.render(
+            target_arch=self._platform.arch,
+            target_triple=self._platform.cc_toolchain,
+            cc_root=self._target_sysroot,
+            ros_root='{cc_root_dir}/sysroot/opt/ros/{distro}'.format(
+                cc_root_dir=self._target_sysroot, distro=self._platform.distro))
+        with open(str(cc_build_setup_file_path), 'w') as out_f:
+            out_f.write(cc_build_setup_file_contents)
+        return cc_build_setup_file_path
 
-def export_workspace_sysroot_image(
-        image_tag: str, target_sysroot_path: Path) -> None:
-    """Export sysroot filesystem into sysroot directory."""
-    logger.info('Exporting sysroot to path [{}]'.format(target_sysroot_path))
-    shutil.rmtree(str(target_sysroot_path), ignore_errors=True)
-    # TODO: Use context to make sure temp directory doesn't leak
-    tmp_sysroot_dir = tempfile.mkdtemp(suffix='-cc_build')
-    sysroot_tarball_path = Path(tmp_sysroot_dir) / (SYSROOT_DIR_NAME + '.tar')
-    logger.info('Exporting filesystem of image {} into tarball {}'.format(
-        image_tag, sysroot_tarball_path))
-    try:
-        sysroot_container = DOCKER_CLIENT.containers.run(
-            image=image_tag, detach=True)
-        with open(str(sysroot_tarball_path), 'wb') as out_f:
-            out_f.writelines(sysroot_container.export())
-        sysroot_container.stop()
-        with tarfile.open(str(sysroot_tarball_path)) as sysroot_tar:
-            relevant_dirs = ['lib', 'usr', 'etc', 'opt', 'root_path', 'ros2_ws/install']
-            relevant_members = (
-                m for m in sysroot_tar.getmembers()
-                if re.match('^({}).*'.format('|'.join(relevant_dirs)), m.name)
-                is not None)
-            sysroot_tar.extractall(str(target_sysroot_path),
-                                   members=relevant_members)
-    finally:
-        shutil.rmtree(tmp_sysroot_dir, ignore_errors=True)
-    logger.info('Success exporting sysroot to path [{}]'.format(target_sysroot_path))
+    def _write_cc_system_setup_script(self) -> Path:
+        """Create setup file for sysroot setup."""
+        cc_system_setup_script_path = self._target_sysroot / 'cc_system_setup.bash'
+        cc_system_setup_script_contents = CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.render(
+            cc_root=self._target_sysroot,
+            target_triple=self._platform.cc_toolchain)
+        with open(str(cc_system_setup_script_path), 'w') as out_f:
+            out_f.write(cc_system_setup_script_contents)
+        return cc_system_setup_script_path
 
+    def write_setup_scripts(self) -> None:
+        """Write both the build and system setup scripts."""
+        self._system_setup_script_path = self._write_cc_build_setup_script()
+        self._build_setup_script_path = self._write_cc_system_setup_script()
 
-def write_cc_build_setup_file(cc_root_dir: Path, platform: Platform) -> Path:
-    """Create setup file for cross-compile build."""
-    cc_build_setup_file_path = cc_root_dir / 'cc_build_setup.bash'
-    cc_build_setup_file_contents = CC_BUILD_SETUP_FILE_TEMPLATE.render(
-        target_arch=platform.arch,
-        target_triple=platform.cc_toolchain,
-        cc_root=cc_root_dir,
-        ros_root='{cc_root_dir}/sysroot/opt/ros/{distro}'.format(
-            cc_root_dir=cc_root_dir, distro=platform.distro))
-    with open(str(cc_build_setup_file_path), 'w') as out_f:
-        out_f.write(cc_build_setup_file_contents)
-    return cc_build_setup_file_path
-
-
-def write_cc_system_setup_script(
-        cc_root_dir: Path, platform: Platform) -> Path:
-    """Create setup file for sysroot setup."""
-    cc_system_setup_script_path = cc_root_dir / 'cc_system_setup.bash'
-    cc_system_setup_script_contents = \
-        CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.render(
-            cc_root=cc_root_dir,
-            target_triple=platform.cc_toolchain
-        )
-    with open(str(cc_system_setup_script_path), 'w') as out_f:
-        out_f.write(cc_system_setup_script_contents)
-    return cc_system_setup_script_path
-
-
-def setup_sysroot_environment(
-        sys_setup_path: Path, build_setup_path: Path) -> None:
-    """Set up the environment with variables and symbolic links."""
-    logger.info('Sourcing sysroot environment...')
-    logger.info("Executing 'bash {}'".format(sys_setup_path))
-    subprocess.run(['bash', str(sys_setup_path)])
-    logger.info("Executing 'source {}'".format(build_setup_path))
-    subprocess.run(['source', str(build_setup_path)], shell=True)
+    def setup_sysroot_environment(self) -> None:
+        """Set up the environment with variables and symbolic links."""
+        logger.info('Sourcing sysroot environment...')
+        logger.info("Executing 'bash {}'".format(self._system_setup_script_path))
+        subprocess.run(['bash', str(self._system_setup_script_path)])
+        logger.info("Executing 'source {}'".format(self._build_setup_script_path))
+        subprocess.run(['source', str(self._build_setup_script_path)], shell=True)
 
 
 def create_arg_parser():
@@ -407,31 +411,16 @@ def main():
     args = parser.parse_args()
     platform = Platform(args)
     docker_args = DockerConfig(args)
-    docker_image_tag = get_workspace_image_tag(platform)
     sysroot_path = args.sysroot_path
     ros2_workspace = args.ros2_workspace
 
     # Main pipeline
-    if sysroot_path is None:
-        cc_root_dir = setup_cc_root_dir(platform, sysroot_path)
-    else:
-        cc_root_dir = Path(sysroot_path)
-
-    sysroot_dir = setup_sysroot_dir(cc_root_dir, ros2_workspace)
-
-    build_workspace_sysroot_image(platform, docker_args, docker_image_tag, sysroot_dir,
-                                  ros2_workspace)
-
-    export_workspace_sysroot_image(docker_image_tag, sysroot_dir)
-
-    cc_build_setup_file_path = write_cc_build_setup_file(cc_root_dir, platform)
-
-    # generalization of the Poco hack
-    # from https://github.com/ros2/cross_compile/blob/master/entry_point.sh#L38
-    cc_system_setup_script_path = write_cc_system_setup_script(cc_root_dir, platform)
-
-    setup_sysroot_environment(cc_system_setup_script_path,
-                              cc_build_setup_file_path)
+    sysroot_create = SysrootCreator(cc_root_dir=sysroot_path, ros_workspace_dir=ros2_workspace,
+                                    platform=platform, docker_config=docker_args)
+    sysroot_create.build_workspace_sysroot_image()
+    sysroot_create.export_workspace_sysroot_image()
+    sysroot_create.write_setup_scripts()
+    sysroot_create.setup_sysroot_environment()
 
     logger.info("""
     To setup the cross compilation build environment:
@@ -444,8 +433,8 @@ cross-compilation.
 cross-compiled ROS packages.
        source {cc_build_setup_file_path}
 
-    """.format(cc_system_setup_script_path=cc_system_setup_script_path,
-               cc_build_setup_file_path=cc_build_setup_file_path))
+    """.format(cc_system_setup_script_path=sysroot_create.get_system_setup_script_path(),
+               cc_build_setup_file_path=sysroot_create.get_build_setup_script_path()))
 
 
 if __name__ == '__main__':
