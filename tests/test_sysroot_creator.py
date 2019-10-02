@@ -18,6 +18,7 @@
 import os
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Tuple
 
 import pytest
 
@@ -56,7 +57,7 @@ def docker_config() -> DockerConfig:
     return DockerConfig(_default_args())
 
 
-def setup_mock_sysroot(path):
+def setup_mock_sysroot(path: Path) -> Tuple[Path, Path]:
     """Creates mock directories to correctly construct the SysrootCreator."""
     sysroot_dir = path / SYSROOT_DIR_NAME
     sysroot_dir.mkdir()
