@@ -22,12 +22,12 @@ from typing import Tuple
 
 import pytest
 
-from sysroot_creator.scripts.create_cc_sysroot import DockerConfig
-from sysroot_creator.scripts.create_cc_sysroot import Platform
-from sysroot_creator.scripts.create_cc_sysroot import SysrootCreator
-from sysroot_creator.scripts.create_cc_sysroot import SYSROOT_DIR_NAME
-from sysroot_creator.scripts.create_cc_sysroot import QEMU_DIR_NAME
-from sysroot_creator.scripts.create_cc_sysroot import DOCKER_WS_NAME
+from cross_compile.sysroot_creator.create_cc_sysroot import DockerConfig
+from cross_compile.sysroot_creator.create_cc_sysroot import Platform
+from cross_compile.sysroot_creator.create_cc_sysroot import SysrootCompiler
+from cross_compile.sysroot_creator.create_cc_sysroot import SYSROOT_DIR_NAME
+from cross_compile.sysroot_creator.create_cc_sysroot import QEMU_DIR_NAME
+from cross_compile.sysroot_creator.create_cc_sysroot import DOCKER_WS_NAME
 
 
 def _default_args() -> SimpleNamespace:
@@ -90,11 +90,11 @@ def test_docker_config_args(docker_config):
     assert config_string == test_config_string
 
 
-def test_sysroot_creator_constructor(platform_config, docker_config, tmp_path):
-    """Test the SysrootCreator constructor assuming valid path setup."""
+def test_sysroot_compiler_constructor(platform_config, docker_config, tmp_path):
+    """Test the SysrootCompiler constructor assuming valid path setup."""
     # Create mock directories and files
     sysroot_dir, ros_workspace_dir = setup_mock_sysroot(tmp_path)
-    sysroot_creator = SysrootCreator(
+    sysroot_creator = SysrootCompiler(
         sysroot_dir, ros_workspace_dir, platform_config, docker_config)
 
     assert isinstance(sysroot_creator.get_build_setup_script_path(), Path)
@@ -104,7 +104,7 @@ def test_sysroot_creator_constructor(platform_config, docker_config, tmp_path):
 def test_write_cc_build_setup_file(platform_config, docker_config, tmp_path):
     """Check if the build setup file was written to directory."""
     sysroot_dir, ros_workspace_dir = setup_mock_sysroot(tmp_path)
-    sysroot_creator = SysrootCreator(
+    sysroot_creator = SysrootCompiler(
         sysroot_dir, ros_workspace_dir, platform_config, docker_config)
     setup_script_path = sysroot_creator._write_cc_build_setup_script()
 
@@ -115,7 +115,7 @@ def test_write_cc_build_setup_file(platform_config, docker_config, tmp_path):
 def test_write_cc_system_setup_file(platform_config, docker_config, tmp_path):
     """Check if the system setup file was written to directory."""
     sysroot_dir, ros_workspace_dir = setup_mock_sysroot(tmp_path)
-    sysroot_creator = SysrootCreator(
+    sysroot_creator = SysrootCompiler(
         sysroot_dir, ros_workspace_dir, platform_config, docker_config)
     setup_script_path = sysroot_creator._write_cc_system_setup_script()
 

@@ -144,7 +144,7 @@ class DockerConfig:
             self.base_image, self.network_mode, self.nocache)
 
 
-class SysrootCreator:
+class SysrootCompiler:
     """A class that configures and builds a Docker container for cross-compiling ROS2 packages."""
     def __init__(
       self,
@@ -153,7 +153,7 @@ class SysrootCreator:
       platform: Platform,
       docker_config: DockerConfig) -> None:
         """
-        Construct a SysrootCreator object the builds a Docker container used for cross compilation.
+        Construct a SysrootCompiler that builds a Docker container used for cross compilation.
 
         :param cc_root_dir: The directory containing the 'sysroot' directory with the ROS2
         workspace and QEMU binaries.
@@ -423,8 +423,8 @@ def main():
     ros2_workspace = args.ros2_workspace
 
     # Main pipeline
-    sysroot_create = SysrootCreator(cc_root_dir=sysroot_path, ros_workspace_dir=ros2_workspace,
-                                    platform=platform, docker_config=docker_args)
+    sysroot_create = SysrootCompiler(cc_root_dir=sysroot_path, ros_workspace_dir=ros2_workspace,
+                                     platform=platform, docker_config=docker_args)
     sysroot_create.build_workspace_sysroot_image()
     sysroot_create.export_workspace_sysroot_image()
     sysroot_create.write_setup_scripts()

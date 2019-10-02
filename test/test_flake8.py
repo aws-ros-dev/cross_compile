@@ -46,7 +46,7 @@ def test_flake8():
         str(Path(__file__).parents[1] / 'sysroot_creator'),
     ])
     report_tests = style_guide_tests.check_files([
-        str(Path(__file__).parents[1] / 'tests'),
+        str(Path(__file__).parents[1] / 'test'),
     ])
     sys.stdout = stdout
 
