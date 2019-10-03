@@ -146,6 +146,7 @@ class DockerConfig:
 
 class SysrootCompiler:
     """A class that configures and builds a Docker container for cross-compiling ROS2 packages."""
+
     def __init__(
       self,
       cc_root_dir: str,
@@ -190,11 +191,11 @@ class SysrootCompiler:
             logger.exception(e)
 
     def get_system_setup_script_path(self) -> Path:
-        """Returns the path to the system setup script."""
+        """Return the path to the system setup script."""
         return self._system_setup_script_path
 
     def get_build_setup_script_path(self) -> Path:
-        """Returns the path to the build setup script."""
+        """Return the path to the build setup script."""
         return self._build_setup_script_path
 
     def _setup_sysroot_dir(self) -> None:

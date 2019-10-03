@@ -40,6 +40,7 @@ setup(
     license='Apache License, Version 2.0',
     tests_require=[
         'pytest',
+        'flake8'
     ],
     entry_points={
         'console_scripts': [

@@ -28,11 +28,6 @@ def test_flake8():
     style_guide = get_style_guide(
         extend_ignore=['D100', 'D104'],
         show_source=True,
-        exclude=[
-            Path(__file__).parents[1] / 'sysroot_creator/scripts/sysroot',
-            Path(__file__).parents[1] / 'sysroot_creator/scripts/aarch*',
-            Path(__file__).parents[1] / 'sysroot_creator/scripts/armhf*',
-        ],
     )
     style_guide_tests = get_style_guide(
         extend_ignore=['D100', 'D101', 'D102', 'D103', 'D104', 'D105', 'D107'],
@@ -43,7 +38,7 @@ def test_flake8():
     sys.stdout = sys.stderr
 
     report = style_guide.check_files([
-        str(Path(__file__).parents[1] / 'sysroot_creator'),
+        str(Path(__file__).parents[1] / 'cross_compile'),
     ])
     report_tests = style_guide_tests.check_files([
         str(Path(__file__).parents[1] / 'test'),
