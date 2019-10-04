@@ -15,6 +15,7 @@
 
 """Package setup for cross_compile."""
 
+import os
 from setuptools import find_packages
 from setuptools import setup
 
@@ -29,8 +30,11 @@ setup(
     url='https://github.com/ros2/cross_compile',
     data_files=[
         ('share/' + package_name, ['package.xml']),
-        ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
+        ('share/ament_index/resource_index/packages', [os.path.join('resource', package_name)]),
     ],
+    package_data={
+        package_name: ['Dockerfile_workspace']
+    },
     install_requires=[
         'setuptools',
         'docker',
@@ -44,7 +48,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'sysroot_compiler = cross_compile.sysroot_compiler:main'
+            'cross_compile = cross_compile.ros2_cross_compile:main'
         ]
     }
 )
