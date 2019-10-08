@@ -94,11 +94,6 @@ RUN rosdep install --from-paths src /opt/ros/${ROS_DISTRO}/share \
         rti-connext-dds-5.3.1 \
         urdfdom_headers"
 
-# Ignore some package that have known errors
-RUN touch \
-    src/ros2/rviz/COLCON_IGNORE \
-    src/ros-visualization/COLCON_IGNORE
-
 RUN colcon mixin add cc_mixin \
     https://raw.githubusercontent.com/aws-ros-dev/cross_compile/cc-sysroot-creator/mixins/index.yaml && \
     colcon mixin update cc_mixin
