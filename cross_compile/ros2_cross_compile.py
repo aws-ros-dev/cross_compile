@@ -105,7 +105,7 @@ def main():
     docker_args = DockerConfig(args)
 
     # Main pipeline
-    sysroot_create = SysrootCompiler(cc_root_dir=args.sysroot_path, ros_workspace_dir=args.sros2_workspace,
+    sysroot_create = SysrootCompiler(cc_root_dir=args.sysroot_path, ros_workspace_dir=args.ros2_workspace,
                                      platform=platform, docker_config=docker_args)
     sysroot_create.execute_cc_pipeline()
 
