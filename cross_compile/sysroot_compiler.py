@@ -27,35 +27,29 @@ from typing import Dict
 
 import docker
 
-import jinja2
 
+CC_BUILD_SETUP_FILE_TEMPLATE = Template(
+    'shell=`echo $$SHELL | awk -F/ \'{print $NF}\'`\n'
+    'if [ -d $ros_root ]\n'
+    'then\n'
+    '\tsource $ros_root/setup.$shell\n'
+    'else\n'
+    '\techo "WARNING: no ROS distro found on the sysroot"\n'
+    'fi\n\n'
+    'export TARGET_ARCH=$target_arch\n'
+    'export TARGET_TRIPLE=$target_triple\n'
+    'export CC_ROOT=$cc_root\n')
 
-CC_BUILD_SETUP_FILE_TEMPLATE = jinja2.Template("""
-shell=`echo $SHELL | awk -F/ '{print $NF}'`
-if [ -d {{ros_root}} ]
-then
-    source {{ros_root}}/setup.$shell
-else
-    echo "WARNING: no ROS distro found on the sysroot"
-fi
-
-export TARGET_ARCH={{target_arch}}
-export TARGET_TRIPLE={{target_triple}}
-export CC_ROOT={{cc_root}}
-""")  # noqa
-
-CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE = jinja2.Template("""
-sudo rm -rf /lib/{{target_triple}}
-sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} /lib/{{target_triple}}
-sudo rm -rf /usr/lib/{{target_triple}}
-sudo ln -s {{cc_root}}/sysroot/usr/lib/{{target_triple}} /usr/lib/{{target_triple}}
-
-CROSS_COMPILER_LIB=/usr/{{target_triple}}/lib
-CROSS_COMPILER_LIB_BAK=/usr/{{target_triple}}/lib_$(date +%s).bak
-echo "Backing up $CROSS_COMPILER_LIB to $CROSS_COMPILER_LIB_BAK"
-sudo mv $CROSS_COMPILER_LIB $CROSS_COMPILER_LIB_BAK
-sudo ln -s {{cc_root}}/sysroot/lib/{{target_triple}} $CROSS_COMPILER_LIB
-""")  # noqa
+CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE = Template(
+    'sudo rm -rf /lib/$target_triple\n'
+    'sudo ln -s $cc_root/sysroot/lib/$target_triple /lib/$target_triple\n'
+    'sudo rm -rf /usr/lib/$target_triple\n'
+    'sudo ln -s $cc_root/sysroot/usr/lib/$target_triple /usr/lib/$target_triple\n\n'
+    'CROSS_COMPILER_LIB=/usr/$target_triple/lib\n'
+    'CROSS_COMPILER_LIB_BAK=/usr/$target_triple/lib_$$(date +%s).bak\n'
+    'echo "Backing up $$CROSS_COMPILER_LIB to $$CROSS_COMPILER_LIB_BAK"\n'
+    'sudo mv $$CROSS_COMPILER_LIB $$CROSS_COMPILER_LIB_BAK\n'
+    'sudo ln -s $cc_root/sysroot/lib/$target_triple $$CROSS_COMPILER_LIB\n')
 
 ROS_WS_DIR_ERROR_STRING = Template('\'$ros_ws\' does not exist in the sysroot directory. Make '
                                    'sure you copy your packages as \'$ros_ws/src\' into the '
@@ -300,7 +294,7 @@ class SysrootCompiler:
     def _write_cc_build_setup_script(self) -> Path:
         """Create setup file for cross-compile build."""
         cc_build_setup_file_path = self._target_sysroot / 'cc_build_setup.bash'
-        cc_build_setup_file_contents = CC_BUILD_SETUP_FILE_TEMPLATE.render(
+        cc_build_setup_file_contents = CC_BUILD_SETUP_FILE_TEMPLATE.substitute(
             target_arch=self._platform.arch,
             target_triple=self._platform.cc_toolchain,
             cc_root=self._target_sysroot,
@@ -313,7 +307,7 @@ class SysrootCompiler:
     def _write_cc_system_setup_script(self) -> Path:
         """Create setup file for sysroot setup."""
         cc_system_setup_script_path = self._target_sysroot / 'cc_system_setup.bash'
-        cc_system_setup_script_contents = CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.render(
+        cc_system_setup_script_contents = CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.substitute(
             cc_root=self._target_sysroot,
             target_triple=self._platform.cc_toolchain)
         with open(str(cc_system_setup_script_path), 'w') as out_f:
