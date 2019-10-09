@@ -98,13 +98,22 @@ trap 'cleanup $CONTAINER_NAME $result' EXIT
 
 # Testing starts here
 setup
+
+# Check if the ros2 command exists
+log "Checking for ros2 command in PATH..."
+if ! type ros2 > /dev/null; then
+  error "Unable to find ros2 in PATH. Make sure you have sourced your environment/workspace properly."
+  result=1
+  exit 1
+fi
+
 # Run the cross compilation script
 log "Executing cross compilation script..."
 ros2 run cross_compile cross_compile --arch "$arch" --os "$os" --distro "$distro" --rmw "$rmw" \
                                         --sysroot-path "$temp_path"
 CC_SCRIPT_STATUS=$?
 if [[ "$CC_SCRIPT_STATUS" -ne 0 ]]; then
-  error "Unable to run cross compile script."
+  error "Failed to run cross compile script."
   result=1
   exit 1
 fi
@@ -123,7 +132,7 @@ log "Executing node in Docker container..."
 docker exec -t "$CONTAINER_NAME" bash -c 'source /ros2_ws/install/local_setup.bash && dummy_binary'
 IS_PUBLISHER_RUNNING=$?
 if [[ "IS_PUBLISHER_RUNNING" -ne 0 ]]; then
-  error "Error while executing publisher."
+  error "Failed to run the dummy binary in the Docker container."
   result=1
   exit 1
 fi
