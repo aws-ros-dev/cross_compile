@@ -120,10 +120,10 @@ if [[ "$IS_CONTAINER_RUNNING" != "true" ]]; then
 fi
 
 log "Executing node in Docker container..."
-docker exec -t "$CONTAINER_NAME" bash -c 'source /ros2_ws/install/local_setup.bash && dummy_binary'
-IS_PUBLISHER_RUNNING=$?
-if [[ "IS_PUBLISHER_RUNNING" -ne 0 ]]; then
-  error "Error while executing publisher."
+docker exec -t "$CONTAINER_NAME" bash -c 'source /ros2_ws/install/local_setup.bash && ros2 run dummy_pkg dummy_binary'
+IS_DUMMY_BINARY_RUNNING=$?
+if [[ "IS_DUMMY_BINARY_RUNNING" -ne 0 ]]; then
+  error "Error while executing the test binary (dummy_binary)."
   result=1
   exit 1
 fi
