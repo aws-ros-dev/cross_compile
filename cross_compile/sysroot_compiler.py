@@ -30,10 +30,10 @@ import docker
 
 
 CC_BUILD_SETUP_FILE_TEMPLATE = Template(
-    'shell=`echo $$SHELL | awk -F/ \'{print $NF}\'`\n'
+    'shell=`echo $$SHELL | awk -F/ \'{print $$NF}\'`\n'
     'if [ -d $ros_root ]\n'
     'then\n'
-    '\tsource $ros_root/setup.$shell\n'
+    '\tsource $ros_root/setup.$$shell\n'
     'else\n'
     '\techo "WARNING: no ROS distro found on the sysroot"\n'
     'fi\n\n'
@@ -231,7 +231,6 @@ class SysrootCompiler:
             'TARGET_TRIPLE': self._platform.cc_toolchain,
             'TARGET_ARCH': self._platform.arch,
         }
-        logger.debug('Build Arguments: {}').format(buildargs)
         logger.info('Building workspace image: {}'.format(image_tag))
 
         # Switch to low-level API to expose build logs

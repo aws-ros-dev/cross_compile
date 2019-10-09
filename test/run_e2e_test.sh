@@ -100,7 +100,7 @@ trap 'cleanup $CONTAINER_NAME $result' EXIT
 setup
 # Run the cross compilation script
 log "Executing cross compilation script..."
-ros2 run cross_compile sysroot_compiler --arch "$arch" --os "$os" --distro "$distro" --rmw "$rmw" \
+ros2 run cross_compile cross_compile --arch "$arch" --os "$os" --distro "$distro" --rmw "$rmw" \
                                         --sysroot-path "$temp_path"
 CC_SCRIPT_STATUS=$?
 if [[ "$CC_SCRIPT_STATUS" -ne 0 ]]; then
