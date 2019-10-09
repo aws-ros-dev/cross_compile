@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Script to generate sysroot for cross-compiling ROS2."""
+"""Compilation workflow setup to generate sysroot for cross-compiling ROS2 packages."""
 
 import logging
 import os
-from pathlib import Path
 import re
 import shutil
-from string import Template
 import subprocess
 import tarfile
 import tempfile
+from pathlib import Path
+from string import Template
 from typing import Dict
+
 
 import docker
 
@@ -51,19 +52,19 @@ CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE = Template(
     'sudo mv $$CROSS_COMPILER_LIB $$CROSS_COMPILER_LIB_BAK\n'
     'sudo ln -s $cc_root/sysroot/lib/$target_triple $$CROSS_COMPILER_LIB\n')
 
-ROS_WS_DIR_ERROR_STRING = Template('\'$ros_ws\' does not exist in the sysroot directory. Make '
-                                   'sure you copy your packages as \'$ros_ws/src\' into the '
-                                   '\'sysroot\' directory.')
-QEMU_DIR_ERROR_STRING = Template('\'$qemu_dir\' does not exist in the sysroot directory. Make '
-                                 'sure you copy the binaries from \'/usr/bin/qemu-*\' into the '
-                                 'sysroot directory.')
-QEMU_EMPTY_ERROR_STRING = Template('\'$qemu_dir\' is empty. Make sure you copy the binaries from '
-                                   '\'/usr/bin/qemu-*\' into \'$qemu_dir\'.')
-COPY_DOCKER_WS_ERROR_STRING = Template('Unable to copy the \'$dockerfile\' file. Make sure you '
-                                       'have write permissions to the sysroot directory.')
-SYSROOT_NOT_FOUND_ERROR_STRING = Template('Sysroot directory not found at \'$sysroot_dir\'. Make '
-                                          'sure you specify the full path to the directory '
-                                          'containing \'sysroot\'.')
+ROS_WS_DIR_ERROR_STRING = Template('\'$ros_ws\' does not exist in the sysroot directory. Make '  # noqa
+                                   'sure you copy your packages as \'$ros_ws/src\' into the '  # noqa
+                                   '\'sysroot\' directory.')  # noqa
+QEMU_DIR_ERROR_STRING = Template('\'$qemu_dir\' does not exist in the sysroot directory. Make '  # noqa
+                                 'sure you copy the binaries from \'/usr/bin/qemu-*\' into the '  # noqa
+                                 'sysroot directory.')  # noqa
+QEMU_EMPTY_ERROR_STRING = Template('\'$qemu_dir\' is empty. Make sure you copy the binaries from '  # noqa
+                                   '\'/usr/bin/qemu-*\' into \'$qemu_dir\'.')  # noqa
+COPY_DOCKER_WS_ERROR_STRING = Template('Unable to copy the \'$dockerfile\' file. Make sure you '  # noqa
+                                       'have write permissions to the sysroot directory.')  # noqa
+SYSROOT_NOT_FOUND_ERROR_STRING = Template('Sysroot directory not found at \'$sysroot_dir\'. Make '  # noqa
+                                          'sure you specify the full path to the directory '  # noqa
+                                          'containing \'sysroot\'.')  # noqa
 SYSROOT_DIR_NAME: str = 'sysroot'
 QEMU_DIR_NAME: str = 'qemu-user-static'
 DOCKER_WS_NAME: str = 'Dockerfile_workspace'
@@ -158,13 +159,13 @@ class SysrootCompiler:
         image to build.
         """
         if not isinstance(cc_root_dir, str):
-            raise TypeError("Argument `cc_root_dir` must be of type string.")
+            raise TypeError('Argument `cc_root_dir` must be of type string.')
         if not isinstance(ros_workspace_dir, str):
-            raise TypeError("Argument `ros_workspace_dir` must be of type string.")
+            raise TypeError('Argument `ros_workspace_dir` must be of type string.')
         if not isinstance(platform, Platform):
-            raise TypeError("Argument `platform` must be of type Platform.")
+            raise TypeError('Argument `platform` must be of type Platform.')
         if not isinstance(docker_config, DockerConfig):
-            raise TypeError("Argument `docker_config` must be of type DockerConfig.")
+            raise TypeError('Argument `docker_config` must be of type DockerConfig.')
 
         self._cc_root_dir = Path(cc_root_dir)
         self._ros_workspace_dir = Path(ros_workspace_dir)
@@ -192,7 +193,7 @@ class SysrootCompiler:
         return self._build_setup_script_path
 
     def _setup_sysroot_dir(self) -> None:
-        """Checks to make sure the sysroot directory is setup correctly.
+        """Check to make sure the sysroot directory is setup correctly.
 
         Raises FileNotFoundError's if any of the components necessary for cross compilation is
         missing. Copies the Dockerfile_workspace to the 'sysroot' directory in order to copy the
@@ -230,7 +231,7 @@ class SysrootCompiler:
             'TARGET_TRIPLE': self._platform.cc_toolchain,
             'TARGET_ARCH': self._platform.arch,
         }
-        logger.debug("Build Arguments: {}")
+        logger.debug('Build Arguments: {}').format(buildargs)
         logger.info('Building workspace image: {}'.format(image_tag))
 
         # Switch to low-level API to expose build logs
@@ -328,6 +329,7 @@ class SysrootCompiler:
         subprocess.run(['source', str(self._build_setup_script_path)], shell=True)
 
     def execute_cc_pipeline(self) -> bool:
+        """Execute the entire cross compilation workflow."""
         try:
             self.build_workspace_sysroot_image()
             self.export_workspace_sysroot_image()

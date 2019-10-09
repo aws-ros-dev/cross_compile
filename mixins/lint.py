@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-"""
-Lint the index.yaml file as well as all files ending with .mixin.
+"""Lint the index.yaml file as well as all files ending with .mixin.
+
 Taken from https://github.com/colcon/colcon-mixin-repository.
 Modified for the AWS mixins repository.
 """
@@ -44,7 +44,7 @@ for name in sorted(os.listdir()):
             '--strict',
             name,
         ])
-        logger.info("Linting complete.")
+        logger.info('Linting complete.')
     except SystemExit as e:
         any_error |= bool(e.code)
         continue

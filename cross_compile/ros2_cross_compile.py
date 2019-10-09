@@ -1,5 +1,21 @@
 #!/usr/bin/env python
 
+# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Executable for cross-compiling ROS2 packages."""
+
 import argparse
 import logging
 from string import Template
@@ -12,21 +28,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-CC_COMPLETE_STRING = Template('To setup the cross compilation build environment: 1. Run the command below to setup '
-                              'using sysroot\'s GLIBC for cross-compilation.\n`bash $system_setup_script_path`\n2. Run '
-                              'the command below to export the environment variables used by the cross-compiled ROS '
-                              'packages.\n`source $build_setup_file_path`')
+CC_COMPLETE_STRING = Template('To setup the cross compilation build environment: 1. Run the '  # noqa
+                              'command below to setup using sysroot\'s GLIBC for '  # noqa
+                              'cross-compilation.\n`bash $system_setup_script_path`\n2. Run the '
+                              'command below to export the environment variables used by the '
+                              'cross-compiled ROS packages.\n`source $build_setup_file_path`')
 
 
 def create_arg_parser():
     """Parse command line arguments."""
-    example_text = '''Example usage:
-    
-    python3 create_cc_sysroot.py --arch armhf --os debian
-    python3 create_cc_sysroot.py --arch aarch64 --os ubuntu
-    python3 create_cc_sysroot.py -a armhf -o ubuntu -d dashing -r fastrtps \
---sysroot-base-image arm64v8/ubuntu:bionic
-    '''
+    example_text = 'Example usage:\n\n' \
+                   'python3 ros2_cross_compile.py /tmp --arch armhf --os debian\n' \
+                   'python3 ros2_cross_compile.py --sysroot-path /home/user/ --arch aarch64 ' \
+                   '--os ubuntu\n' \
+                   'python3 ros2_cross_compile.py --sysroot-path /home/user/' \
+                   '--sysroot-base-image arm64v8/ubuntu:bionic'
     parser = argparse.ArgumentParser(
         description='Sysroot creator for cross compilation workflows.',
         epilog=example_text,
@@ -91,8 +107,8 @@ def create_arg_parser():
         nargs='?',
         help="The full path to the directory containing 'sysroot'. The 'ros2_ws/src' and "
              "'qemu-user-static' directories and the 'Dockerfile_workspace' file used to "
-             "cross-compile the ROS packages should all be in this directory. Defaults to the "
-             "current working directory.")
+             'cross-compile the ROS packages should all be in this directory. Defaults to the '
+             'current working directory.')
     return parser
 
 
@@ -105,8 +121,10 @@ def main():
     docker_args = DockerConfig(args)
 
     # Main pipeline
-    sysroot_create = SysrootCompiler(cc_root_dir=args.sysroot_path, ros_workspace_dir=args.ros2_workspace,
-                                     platform=platform, docker_config=docker_args)
+    sysroot_create = SysrootCompiler(cc_root_dir=args.sysroot_path,
+                                     ros_workspace_dir=args.ros2_workspace,
+                                     platform=platform,
+                                     docker_config=docker_args)
     sysroot_create.execute_cc_pipeline()
 
     logger.info(CC_COMPLETE_STRING.substitute(
