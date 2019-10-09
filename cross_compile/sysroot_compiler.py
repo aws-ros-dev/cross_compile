@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Compilation workflow setup to generate sysroot for cross-compiling ROS2 packages."""
+"""Contains all classes used by the sysroot_compiler.py script."""
 
 import logging
 import os
@@ -29,42 +29,58 @@ from typing import Dict
 import docker
 
 
-CC_BUILD_SETUP_FILE_TEMPLATE = Template(
-    'shell=`echo $$SHELL | awk -F/ \'{print $$NF}\'`\n'
-    'if [ -d $ros_root ]\n'
-    'then\n'
-    '\tsource $ros_root/setup.$$shell\n'
-    'else\n'
-    '\techo "WARNING: no ROS distro found on the sysroot"\n'
-    'fi\n\n'
-    'export TARGET_ARCH=$target_arch\n'
-    'export TARGET_TRIPLE=$target_triple\n'
-    'export CC_ROOT=$cc_root\n')
+CC_BUILD_SETUP_FILE_TEMPLATE = Template("""
+shell=`echo $$SHELL | awk -F/ "{print $$NF}"`
+if [ -d $ros_root ]
+then
+    source $ros_root/setup.$$shell
+else
+    echo "WARNING: no ROS distro found on the sysroot"
+fi
 
-CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE = Template(
-    'sudo rm -rf /lib/$target_triple\n'
-    'sudo ln -s $cc_root/sysroot/lib/$target_triple /lib/$target_triple\n'
-    'sudo rm -rf /usr/lib/$target_triple\n'
-    'sudo ln -s $cc_root/sysroot/usr/lib/$target_triple /usr/lib/$target_triple\n\n'
-    'CROSS_COMPILER_LIB=/usr/$target_triple/lib\n'
-    'CROSS_COMPILER_LIB_BAK=/usr/$target_triple/lib_$$(date +%s).bak\n'
-    'echo "Backing up $$CROSS_COMPILER_LIB to $$CROSS_COMPILER_LIB_BAK"\n'
-    'sudo mv $$CROSS_COMPILER_LIB $$CROSS_COMPILER_LIB_BAK\n'
-    'sudo ln -s $cc_root/sysroot/lib/$target_triple $$CROSS_COMPILER_LIB\n')
+export TARGET_ARCH=$target_arch
+export TARGET_TRIPLE=$target_triple
+export CC_ROOT=$cc_root
+""")
 
-ROS_WS_DIR_ERROR_STRING = Template('\'$ros_ws\' does not exist in the sysroot directory. Make '  # noqa
-                                   'sure you copy your packages as \'$ros_ws/src\' into the '  # noqa
-                                   '\'sysroot\' directory.')  # noqa
-QEMU_DIR_ERROR_STRING = Template('\'$qemu_dir\' does not exist in the sysroot directory. Make '  # noqa
-                                 'sure you copy the binaries from \'/usr/bin/qemu-*\' into the '  # noqa
-                                 'sysroot directory.')  # noqa
-QEMU_EMPTY_ERROR_STRING = Template('\'$qemu_dir\' is empty. Make sure you copy the binaries from '  # noqa
-                                   '\'/usr/bin/qemu-*\' into \'$qemu_dir\'.')  # noqa
-COPY_DOCKER_WS_ERROR_STRING = Template('Unable to copy the \'$dockerfile\' file. Make sure you '  # noqa
-                                       'have write permissions to the sysroot directory.')  # noqa
-SYSROOT_NOT_FOUND_ERROR_STRING = Template('Sysroot directory not found at \'$sysroot_dir\'. Make '  # noqa
-                                          'sure you specify the full path to the directory '  # noqa
-                                          'containing \'sysroot\'.')  # noqa
+CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE = Template("""
+sudo rm -rf /lib/$target_triple
+sudo ln -s $cc_root/sysroot/lib/$target_triple /lib/$target_triple
+sudo rm -rf /usr/lib/$target_triple
+sudo ln -s $cc_root/sysroot/usr/lib/$target_triple /usr/lib/$target_triple
+
+CROSS_COMPILER_LIB=/usr/$target_triple/lib
+CROSS_COMPILER_LIB_BAK=/usr/$target_triple/lib_$$(date +%s).bak
+echo "Backing up $$CROSS_COMPILER_LIB to $$CROSS_COMPILER_LIB_BAK"
+sudo mv $$CROSS_COMPILER_LIB $$CROSS_COMPILER_LIB_BAK
+sudo ln -s $cc_root/sysroot/lib/$target_triple $$CROSS_COMPILER_LIB
+""")
+
+ROS_WS_DIR_ERROR_STRING = Template(
+    """"$ros_ws" does not exist in the sysroot directory. Make """
+    """sure you copy your packages as "$ros_ws/src" into the """
+    """"sysroot" directory."""
+    )
+QEMU_DIR_ERROR_STRING = Template(
+    """"$qemu_dir" does not exist in the sysroot directory. Make """
+    """sure you copy the binaries from "/usr/bin/qemu-*" into the """
+    """sysroot directory."""
+)
+
+QEMU_EMPTY_ERROR_STRING = Template(
+    """"$qemu_dir" is empty. Make sure you copy the binaries from """
+    """"/usr/bin/qemu-*" into "$qemu_dir".""")
+
+COPY_DOCKER_WS_ERROR_STRING = Template(
+    """Unable to copy the "$dockerfile" file. Make sure you """
+    """have write permissions to the sysroot directory."""
+)
+
+SYSROOT_NOT_FOUND_ERROR_STRING = Template(
+    """Sysroot directory not found at "$sysroot_dir". Make """
+    """sure you specify the full path to the directory containing "sysroot"."""
+)
+
 SYSROOT_DIR_NAME: str = 'sysroot'
 QEMU_DIR_NAME: str = 'qemu-user-static'
 DOCKER_WS_NAME: str = 'Dockerfile_workspace'
@@ -105,8 +121,7 @@ class Platform:
 
 
 class DockerConfig:
-    """
-    A class that represents docker build parameters used in creating sysroot.
+    """Represents docker build parameters used in creating sysroot.
 
     Includes:
     1. Base docker image to use for building sysroot
@@ -139,7 +154,7 @@ class DockerConfig:
 
 
 class SysrootCompiler:
-    """A class that configures and builds a Docker container for cross-compiling ROS2 packages."""
+    """Build Docker containers for cross-compiling ROS2 packages."""
 
     def __init__(
       self,
@@ -147,25 +162,27 @@ class SysrootCompiler:
       ros_workspace_dir: str,
       platform: Platform,
       docker_config: DockerConfig) -> None:
-        """
-        Construct a SysrootCompiler that builds a Docker container used for cross compilation.
+        """Construct a SysrootCompiler object building ROS 2 Docker container.
 
-        :param cc_root_dir: The directory containing the 'sysroot' directory with the ROS2
-        workspace and QEMU binaries.
-        :param ros_workspace_dir: The name of the directory containing the ROS2 packages (inside a
-        'src' directory).
-        :param platform: A custom object used to specify the the platform for cross-compilation.
-        :param docker_config: A custom object used to specify the configuration of the Docker
-        image to build.
+        :param cc_root_dir: The directory containing the 'sysroot' directory
+                            with the ROS2 workspace and QEMU binaries.
+        :param ros_workspace_dir: The name of the directory containing the
+                                  ROS2 packages (inside a 'src' directory).
+        :param platform: A custom object used to specify the the platform for
+                         cross-compilation.
+        :param docker_config: A custom object used to specify the configuration
+                              of the Docker image to build.
         """
         if not isinstance(cc_root_dir, str):
             raise TypeError('Argument `cc_root_dir` must be of type string.')
         if not isinstance(ros_workspace_dir, str):
-            raise TypeError('Argument `ros_workspace_dir` must be of type string.')
+            raise TypeError(
+                'Argument `ros_workspace_dir` must be of type string.')
         if not isinstance(platform, Platform):
             raise TypeError('Argument `platform` must be of type Platform.')
         if not isinstance(docker_config, DockerConfig):
-            raise TypeError('Argument `docker_config` must be of type DockerConfig.')
+            raise TypeError(
+                'Argument `docker_config` must be of type DockerConfig.')
 
         self._cc_root_dir = Path(cc_root_dir)
         self._ros_workspace_dir = Path(ros_workspace_dir)
@@ -173,7 +190,8 @@ class SysrootCompiler:
         self._ros_ws_directory = self._target_sysroot / self._ros_workspace_dir
         self._qemu_directory = self._target_sysroot / QEMU_DIR_NAME
         self._dockerfile_directory = Path(__file__).parent / DOCKER_WS_NAME
-        self._expected_dockerfile_directory = self._target_sysroot / DOCKER_WS_NAME
+        self._expected_dockerfile_directory = (
+            self._target_sysroot / DOCKER_WS_NAME)
         self._system_setup_script_path = Path()
         self._build_setup_script_path = Path()
         self._platform = platform
@@ -195,9 +213,10 @@ class SysrootCompiler:
     def _setup_sysroot_dir(self) -> None:
         """Check to make sure the sysroot directory is setup correctly.
 
-        Raises FileNotFoundError's if any of the components necessary for cross compilation is
-        missing. Copies the Dockerfile_workspace to the 'sysroot' directory in order to copy the
-        assets to it (see https://docs.docker.com/engine/reference/builder/#copy).
+        Raises FileNotFoundError's if any of the components necessary for
+        cross compilation is missing. Copies the Dockerfile_workspace to the
+        'sysroot' directory in order to copy the assets to it.
+        See https://docs.docker.com/engine/reference/builder/#copy
         """
         logger.info('Checking sysroot directory...')
         if self._target_sysroot.exists():
@@ -207,11 +226,14 @@ class SysrootCompiler:
                     ros_ws=self._ros_workspace_dir))
             logger.debug('ROS workspace exists.')
             if not self._qemu_directory.exists():
-                raise FileNotFoundError(QEMU_DIR_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
+                raise FileNotFoundError(
+                    QEMU_DIR_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
             if not os.listdir(str(self._qemu_directory.absolute())):
-                raise FileNotFoundError(QEMU_EMPTY_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
+                raise FileNotFoundError(
+                    QEMU_EMPTY_ERROR_STRING.substitute(qemu_dir=QEMU_DIR_NAME))
             logger.debug('QEMU binaries exist')
-            shutil.copy(str(self._dockerfile_directory), str(self._target_sysroot))
+            shutil.copy(
+                str(self._dockerfile_directory), str(self._target_sysroot))
             if not self._expected_dockerfile_directory.exists():
                 raise FileNotFoundError(COPY_DOCKER_WS_ERROR_STRING.substitute(
                     dockerfile=DOCKER_WS_NAME))
@@ -221,7 +243,9 @@ class SysrootCompiler:
 
     def build_workspace_sysroot_image(self) -> None:
         """Build the target sysroot docker image."""
-        logger.info('Fetching sysroot base image: {}'.format(self._docker_config.base_image))
+        logger.info(
+            'Fetching sysroot base image: %s',
+            self._docker_config.base_image)
         DOCKER_CLIENT.images.pull(self._docker_config.base_image)
         image_tag = self._platform.get_workspace_image_tag()
         buildargs = {
@@ -248,48 +272,56 @@ class SysrootCompiler:
             network_mode=self._docker_config.network_mode,
             decode=True)
         for chunk in log_generator:
-            # There are usually two outputs we want to capture, stream and error.
+            # There are two outputs we want to capture, stream and error.
             # We also want to remove newline (\n) and carriage returns (\r) to
             # avoid mangled output.
             error_line = chunk.get('error', None)
             if error_line:
-                logger.exception('Error building sysroot image. The following error'
-                                 ' was caught:\n{}'.format(error_line))
-                raise docker.errors.BuildError(reason=error_line, build_log=error_line)
+                logger.exception(
+                    'Error building sysroot image. The following error'
+                    ' was caught:\n{}'.format(error_line))
+                raise docker.errors.BuildError(
+                    reason=error_line, build_log=error_line)
             line = chunk.get('stream', '')
             line = line.rstrip().lstrip()
             if line:
                 logger.info(line)
 
-        logger.info('Successfully created sysroot docker image: {}'.format(image_tag))
+        logger.info('Successfully created sysroot docker image: %s', image_tag)
 
     def export_workspace_sysroot_image(self) -> None:
         """Export sysroot filesystem into sysroot directory."""
-        logger.info('Exporting sysroot to path [{}]'.format(self._target_sysroot))
+        logger.info('Exporting sysroot to path [%s]', self._target_sysroot)
         shutil.rmtree(str(self._target_sysroot), ignore_errors=True)
         # TODO: Use context to make sure temp directory doesn't leak
         tmp_sysroot_dir = tempfile.mkdtemp(suffix='-cc_build')
-        sysroot_tarball_path = Path(tmp_sysroot_dir) / (SYSROOT_DIR_NAME + '.tar')
+        sysroot_tarball_path = (
+            Path(tmp_sysroot_dir) / (SYSROOT_DIR_NAME + '.tar'))
         image_tag = self._platform.get_workspace_image_tag()
         logger.info('Exporting filesystem of image {} into tarball {}'.format(
             image_tag, sysroot_tarball_path))
 
         try:
-            sysroot_container = DOCKER_CLIENT.containers.run(image=image_tag, detach=True)
+            sysroot_container = DOCKER_CLIENT.containers.run(
+                image=image_tag, detach=True)
             with open(str(sysroot_tarball_path), 'wb') as out_f:
                 out_f.writelines(sysroot_container.export())
             sysroot_container.stop()
             with tarfile.open(str(sysroot_tarball_path)) as sysroot_tar:
-                relevant_dirs = ['lib', 'usr', 'etc', 'opt', 'root_path', 'ros2_ws/install']
+                relevant_dirs = [
+                    'lib', 'usr', 'etc', 'opt', 'root_path', 'ros2_ws/install']
                 relevant_members = (
                     m for m in sysroot_tar.getmembers()
-                    if re.match('^({}).*'.format('|'.join(relevant_dirs)), m.name) is not None
+                    if re.match('^({}).*'.format(
+                        '|'.join(relevant_dirs)), m.name) is not None
                 )
-                sysroot_tar.extractall(str(self._target_sysroot), members=relevant_members)
+                sysroot_tar.extractall(
+                    str(self._target_sysroot), members=relevant_members)
         finally:
             shutil.rmtree(tmp_sysroot_dir, ignore_errors=True)
 
-        logger.info('Success exporting sysroot to path [{}]'.format(self._target_sysroot))
+        logger.info(
+            'Success exporting sysroot to path [%s]', self._target_sysroot)
 
     def _write_cc_build_setup_script(self) -> Path:
         """Create setup file for cross-compile build."""
@@ -299,17 +331,20 @@ class SysrootCompiler:
             target_triple=self._platform.cc_toolchain,
             cc_root=self._target_sysroot,
             ros_root='{cc_root_dir}/sysroot/opt/ros/{distro}'.format(
-                cc_root_dir=self._target_sysroot, distro=self._platform.distro))
+                cc_root_dir=self._target_sysroot,
+                distro=self._platform.distro))
         with open(str(cc_build_setup_file_path), 'w') as out_f:
             out_f.write(cc_build_setup_file_contents)
         return cc_build_setup_file_path
 
     def _write_cc_system_setup_script(self) -> Path:
         """Create setup file for sysroot setup."""
-        cc_system_setup_script_path = self._target_sysroot / 'cc_system_setup.bash'
-        cc_system_setup_script_contents = CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.substitute(
-            cc_root=self._target_sysroot,
-            target_triple=self._platform.cc_toolchain)
+        cc_system_setup_script_path = (
+            self._target_sysroot / 'cc_system_setup.bash')
+        cc_system_setup_script_contents = (
+            CC_BUILD_SYSTEM_SETUP_SCRIPT_TEMPLATE.substitute(
+                cc_root=self._target_sysroot,
+                target_triple=self._platform.cc_toolchain))
         with open(str(cc_system_setup_script_path), 'w') as out_f:
             out_f.write(cc_system_setup_script_contents)
         return cc_system_setup_script_path
@@ -322,10 +357,11 @@ class SysrootCompiler:
     def setup_sysroot_environment(self) -> None:
         """Set up the environment with variables and symbolic links."""
         logger.info('Sourcing sysroot environment...')
-        logger.info("Executing 'bash {}'".format(self._system_setup_script_path))
+        logger.info("Executing 'bash %s'", self._system_setup_script_path)
         subprocess.run(['bash', str(self._system_setup_script_path)])
-        logger.info("Executing 'source {}'".format(self._build_setup_script_path))
-        subprocess.run(['source', str(self._build_setup_script_path)], shell=True)
+        logger.info("Executing 'source %s'", self._build_setup_script_path)
+        subprocess.run(
+            ['source', str(self._build_setup_script_path)], shell=True)
 
     def execute_cc_pipeline(self) -> bool:
         """Execute the entire cross compilation workflow."""

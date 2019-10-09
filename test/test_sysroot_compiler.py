@@ -20,14 +20,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Tuple
 
-import pytest
-
-from cross_compile.sysroot_compiler import DockerConfig
 from cross_compile.sysroot_compiler import DOCKER_WS_NAME
+from cross_compile.sysroot_compiler import DockerConfig
 from cross_compile.sysroot_compiler import Platform
 from cross_compile.sysroot_compiler import QEMU_DIR_NAME
-from cross_compile.sysroot_compiler import SysrootCompiler
 from cross_compile.sysroot_compiler import SYSROOT_DIR_NAME
+from cross_compile.sysroot_compiler import SysrootCompiler
+
+import pytest
 
 
 def _default_args() -> SimpleNamespace:
@@ -38,9 +38,9 @@ def _default_args() -> SimpleNamespace:
     args.os = 'ubuntu'
     args.distro = 'dashing'
     args.rmw = 'fastrtps'
-    args.sysroot_base_image = '035662560449.dkr.ecr.us-east-2.amazonaws.com/' \
-                              'cc-tool:' \
-                              'aarch64-bionic-dashing-fastrtps-prebuilt'
+    args.sysroot_base_image = (
+        '035662560449.dkr.ecr.us-east-2.amazonaws.com/cc-tool:'
+        'aarch64-bionic-dashing-fastrtps-prebuilt')
     args.docker_network_mode = 'host'
     args.sysroot_nocache = 'False'
 
@@ -58,7 +58,7 @@ def docker_config() -> DockerConfig:
 
 
 def setup_mock_sysroot(path: Path) -> Tuple[Path, Path]:
-    """Creates mock directories to correctly construct the SysrootCreator."""
+    """Create mock directories to correctly construct the SysrootCreator."""
     sysroot_dir = path / SYSROOT_DIR_NAME
     sysroot_dir.mkdir()
     ros_workspace_dir = sysroot_dir / 'ros2_ws'
@@ -83,19 +83,25 @@ def test_get_workspace_image_tag(platform_config):
 def test_docker_config_args(docker_config):
     """Make sure the Docker configuration is setup correctly."""
     args = _default_args()
-    test_config_string = 'Base Image: {}\nNetwork Mode: {}\nCaching: {}'.format(
-        args.sysroot_base_image, args.docker_network_mode, args.sysroot_nocache)
+    test_config_string = (
+        'Base Image: {}\n'
+        'Network Mode: {}\n'
+        'Caching: {}').format(
+        args.sysroot_base_image, args.docker_network_mode,
+        args.sysroot_nocache)
     config_string = str(docker_config)
     assert isinstance(config_string, str)
     assert config_string == test_config_string
 
 
-def test_sysroot_compiler_constructor(platform_config, docker_config, tmp_path):
+def test_sysroot_compiler_constructor(
+        platform_config, docker_config, tmp_path):
     """Test the SysrootCompiler constructor assuming valid path setup."""
     # Create mock directories and files
     sysroot_dir, ros_workspace_dir = setup_mock_sysroot(tmp_path)
     sysroot_compiler = SysrootCompiler(
-        str(sysroot_dir), str(ros_workspace_dir), platform_config, docker_config)
+        str(sysroot_dir), str(ros_workspace_dir), platform_config,
+        docker_config)
 
     assert isinstance(sysroot_compiler.get_build_setup_script_path(), Path)
     assert isinstance(sysroot_compiler .get_system_setup_script_path(), Path)
@@ -105,7 +111,7 @@ def test_write_cc_build_setup_file(platform_config, docker_config, tmp_path):
     """Check if the build setup file was written to directory."""
     sysroot_dir, ros_workspace_dir = setup_mock_sysroot(tmp_path)
     sysroot_compiler = SysrootCompiler(
-        str(sysroot_dir), str(ros_workspace_dir), platform_config, docker_config)
+        str(tmp_path), str(ros_workspace_dir), platform_config, docker_config)
     setup_script_path = sysroot_compiler._write_cc_build_setup_script()
 
     assert isinstance(setup_script_path, Path)
@@ -116,7 +122,7 @@ def test_write_cc_system_setup_file(platform_config, docker_config, tmp_path):
     """Check if the system setup file was written to directory."""
     sysroot_dir, ros_workspace_dir = setup_mock_sysroot(tmp_path)
     sysroot_compiler = SysrootCompiler(
-        str(sysroot_dir), str(ros_workspace_dir), platform_config, docker_config)
+        str(tmp_path), str(ros_workspace_dir), platform_config, docker_config)
     setup_script_path = sysroot_compiler._write_cc_system_setup_script()
 
     assert isinstance(setup_script_path, Path)
