@@ -89,15 +89,13 @@ def create_arg_parser():
         '--sysroot-base-image',
         required=False,
         type=str,
-        help='Base Docker image to use for building the sysroot. '
-             'Ex. arm64v8/ubuntu:bionic')
+        help='Base Docker image to use for building the sysroot. Ex. arm64v8/ubuntu:bionic')
     parser.add_argument(
         '--docker-network-mode',
         required=False,
         type=str,
         default='host',
-        help="Docker's network_mode parameter to use for all Docker "
-             'interactions')
+        help="Docker's network_mode parameter to use for all Docker interactions")
     parser.add_argument(
         '--sysroot-nocache',
         action='store_true',
@@ -145,5 +143,5 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as e:
-        logging.exception(e)
+        logger.exception(e)
         exit(1)

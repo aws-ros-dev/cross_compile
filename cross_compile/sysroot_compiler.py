@@ -243,9 +243,7 @@ class SysrootCompiler:
 
     def build_workspace_sysroot_image(self) -> None:
         """Build the target sysroot docker image."""
-        logger.info(
-            'Fetching sysroot base image: %s',
-            self._docker_config.base_image)
+        logger.info('Fetching sysroot base image: %s', self._docker_config.base_image)
         DOCKER_CLIENT.images.pull(self._docker_config.base_image)
         image_tag = self._platform.get_workspace_image_tag()
         buildargs = {
@@ -255,7 +253,7 @@ class SysrootCompiler:
             'TARGET_TRIPLE': self._platform.cc_toolchain,
             'TARGET_ARCH': self._platform.arch,
         }
-        logger.info('Building workspace image: {}'.format(image_tag))
+        logger.info('Building workspace image: %s', image_tag)
 
         # Switch to low-level API to expose build logs
         docker_client = docker.APIClient(base_url='unix://var/run/docker.sock')
@@ -278,10 +276,9 @@ class SysrootCompiler:
             error_line = chunk.get('error', None)
             if error_line:
                 logger.exception(
-                    'Error building sysroot image. The following error'
-                    ' was caught:\n{}'.format(error_line))
-                raise docker.errors.BuildError(
-                    reason=error_line, build_log=error_line)
+                    'Error building sysroot image. The following error was caught:\n%s',
+                    error_line)
+                raise docker.errors.BuildError(reason=error_line, build_log=error_line)
             line = chunk.get('stream', '')
             line = line.rstrip().lstrip()
             if line:
