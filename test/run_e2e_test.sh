@@ -13,6 +13,7 @@ set -uxo pipefail
 # Terminal output colors
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[0;33m'
 readonly CYAN='\033[0;36m'
 readonly NORM='\033[0m'
 # Defaults
@@ -25,6 +26,10 @@ result=1        # Default to failure
 # Loggers
 log(){
   printf "%b%s%b\n" "$CYAN" "$1" "$NORM"
+}
+
+warning(){
+  printf "%b%s%b\n" "$YELLOW" "$1" "$NORM"
 }
 
 error(){
@@ -44,10 +49,12 @@ cleanup(){
     error FAIL
   fi
   rm -rf "$temp_path/sysroot";
+  docker stop -t 2 "$1"
   docker rm "$1" >/dev/null 2>/dev/null;
 }
 
 setup(){
+  # Usage: setup CONTAINER_NAME
   temp_path=$(mktemp -d)
   mkdir "$temp_path/sysroot"
   mkdir -p "$temp_path/sysroot/ros2_ws/src/"
@@ -58,6 +65,11 @@ setup(){
   # Copy QEMU binaries
   mkdir -p "$temp_path/sysroot/qemu-user-static"
   cp /usr/bin/qemu-* "$temp_path/sysroot/qemu-user-static"
+
+  if [[ $(docker inspect -f "{{.State.Running}}" "$CONTAINER_NAME") == "true" ]]; then
+    warning "Container named $CONTAINER_NAME already running. Stopping it before proceeding."
+    docker stop -t 2 "$CONTAINER_NAME"
+  fi
 }
 
 # Argparser
@@ -97,7 +109,7 @@ readonly CONTAINER_TAG="$USER/$arch-$os-$rmw-$distro:latest"
 trap 'cleanup $CONTAINER_NAME $result' EXIT
 
 # Testing starts here
-setup
+setup "$CONTAINER_NAME"
 
 # Check if the ros2 command exists
 log "Checking for ros2 command in PATH..."
