@@ -1,10 +1,12 @@
-# Colcon cc-build
+# ROS2 Cross Compile
 
-Colcon plugin for cross-compilation
+A tool for cross compiling ROS2 packages.
 
-## Install prerequisites
+## Installation
 
-### Ubuntu
+### Prerequisites
+
+#### Ubuntu
 
 The cross compilation toolchain and docker have to be installed. 
 The following instructions have been tested on Ubuntu Xenial (16.04) and Bionic (18.04).
@@ -16,7 +18,7 @@ sudo apt-get install -y build-essential cmake git wget curl lsb-core bash-comple
     qemu-user-static g++-aarch64-linux-gnu g++-arm-linux-gnueabihf python3-pip htop
 sudo python3 -m pip install -U  colcon-common-extensions rosdep vcstool
 
-# Also install docker and make it available to the current user: https://docs.docker.com/install/linux/docker-ce/ubuntu/
+# Also install docker and make it available to the current user
 sudo apt-get install -y apt-transport-https ca-certificates curl gnupg-agent software-properties-common
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 sudo apt-key fingerprint 0EBFCD88
@@ -26,89 +28,88 @@ sudo apt-get install -y docker-ce
 sudo usermod -aG docker $USER
 newgrp docker # this reloads the group permissions in the current shell, unnecessary after relogin
 docker run hello-world
-
-# Install dependencies required by the cross-compile tool
-pip3 install -r requirements.txt
 ```
 
-### Mac
-The following instructions have been tested on Mac OS Mojave (10.14).
+### Installing from source
+
+#### Latest (unstable development - `master` branch)
+Please follow those instructions if you plan to contribute to this repository.
+
+* Install all software dependencies required for ROS 2 development by following the [ROS 2 documentation](https://index.ros.org/doc/ros2/Installation/Latest-Development-Setup/)
+* Checkout the source code and compile it as follows
 
 ```bash
-# Ensure your brew install is healthy
-brew doctor
-brew install cmake git wget curl bash-completion qemu
-python3 -m pip install --user -U  colcon-common-extensions rosdep vcstool
-```
+mkdir -p ~/ros2_cross_compile_ws/src
+cd ros2_cross_compile_ws
 
-[Install Docker toolbox](https://docs.docker.com/toolbox/toolbox_install_mac/)
+# Use vcs to clone all required repositories
+curl https://raw.githubusercontent.com/ros2/ros2/dashing/ros2.repos | vcs import src/
+curl https://raw.githubusercontent.com/ros-tooling/cross_compile/master/cross_compile.repos | vcs import src/
+
+# Install all required system dependencies
+# Some packages may fail to install, this is expected on an unstable branch,
+# and is generally OK.
+rosdep update
+rosdep install -r --rosdistro=eloquent --ignore-packages-from-source --from-paths src/
+
+# Use colcon to compile cross_compile code and all its dependencies
+colcon build --packages-up-to cross_compile
+
+# If you use bash or zsh, source .bash or .zsh, instead of .sh
+source install/local_setup.sh
+```
 
 ## Usage
 
-We need to setup our sysroot directory for the docker image. Docker can only copy from a specific
+We need to setup a `sysroot` directory for the docker artifacts. Docker can only copy from a specific
 context so all these assets need to be copied relative to the `Dockerfile` path.
-```bash
-cd /path/to/sysroot
-# Create a directory to store ROS/qemu assets
-mkdir qemu-user-static ros2_ws
-cp /usr/bin/qemu-* qemu-user-static 
-# Copy ROS Sources
-cp -r ~/ros2_ws/src ros2_ws
-```
 
-For the current setup,
+#### 1. Copy the QEMU Binaries
+
 ```bash
+mkdir sysroot
+cd sysroot
 # Create a directory to store qemu assets
-mkdir -p sysroot_creator/scripts/sysroot/qemu-user-static
-cp -r /usr/bin/qemu-* sysroot_creator/scripts/sysroot/qemu-user-static/
-
-# Get ROS sources (if there is no existing source checkout)
-# release-latest (dashing)
-wget https://raw.githubusercontent.com/ros2/ros2/release-latest/ros2.repos
-# crystal
-wget https://raw.githubusercontent.com/ros2/ros2/crystal/ros2.repos
-
-# Copy ROS Sources
-mkdir -p sysroot_creator/scripts/sysroot/ros2_ws/src
-
-# If there is no existing source checkout
-vcs import sysroot_creator/scripts/sysroot/ros2_ws/src < ros2.repos 
-
-# From an existing workspace
-cp -r ~/ros2_ws sysroot_creator/scripts/sysroot/ros2_ws
+mkdir qemu-user-static
+cp /usr/bin/qemu-* qemu-user-static 
 ```
+
+#### 2. Copy the ROS2 packages
+
+If you want to cross compile specific local packages:
+
+```
+# Create a directory to store source packages
+mkdir -p ros2_ws/src
+cp -r <full_path_to_your_ros_ws>/src ros2_ws/src
+```
+
+If you want to cross compile the latest ROS2 release instead of your workspace:
+
+```bash
+mkdir -p ros2_ws/src
+# Get ROS2 sources
+wget https://raw.githubusercontent.com/ros2/ros2/release-latest/ros2.repos
+vcs import sysroot_creator/scripts/sysroot/ros2_ws/src < ros2.repos 
+```
+
+#### 3. Run the cross compilation script
 
 In the end your `sysroot` directory should look like this:
 ```bash
-sysroot
- |-- Dockerfile_workspace
- +-- qemu-user-static
+sysroot/
+ +-- qemu-user-static/
  |   +-- qemu-*-static
- +-- ros2_ws
-     +-- src
+ +-- ros2_ws/
+     +-- src/
           |-- (ros2 packages) 
           +-- ...
 ```
 
-### Building a workspace
+Then run the tool:
 
-1. Setup the sysroot
-
-Add --force-sysroot-build to force rebuilding the sysroot
 ```bash
-python3 create_cc_sysroot.py --arch [armhf|aarch64] --os [ubuntu|debian]
-```
-2. Install the colcon mixins for cross-compilation
-```bash
-colcon mixin add cc_mixins file://<path_to_cross_compile_repo>/mixins/index.yaml
-colcon mixin update cc_mixins 
-# Check the mixins are installed by running
-colcon mixin show
-```
-3. Launch cross compilation using the sysroot created and colcon mixin for target architecture
-```bash
-colcon build --mixin [armhf-generic_linux|aarch64-generic_linux]
-  --packages-up-to examples_rclcpp_minimal_publisher
+ros2 run cross_compile cross_compile --arch aarch64 --os ubuntu --sysroot-path /directory/with/sysroot 
 ```
 
 #### Sample Docker images
@@ -117,27 +118,10 @@ You can use the [Official Dockerhub ROS Repo](https://hub.docker.com/_/ros) to f
 
 You can also use [OSRF's Dockerhub Repo](https://hub.docker.com/r/osrf/ros2) to obtain images as well.
 
-#### Assumptions
+## License
+This library is licensed under the Apache 2.0 License.
 
-- The Docker image for `--sysroot-base-image` installs the ROS 2 distro at `/opt/ros/${distro}`.
-
-### Troubleshooting
-
-#### Debug
-
-To manually build and/or run the workspace image
-
-```bash
-docker image build -f colcon_cc_build/colcon_cc_build/verb/sysroot/Dockerfile_workspace \
-  --network host \
-  -t ros2_benchmark_pipeline:latest \
-  --build-arg ROS2_BASE_IMG=<your-base-image> \
-  --build-arg ROS2_WORKSPACE=. --build-arg ROS_DISTRO=crystal --build-arg TARGET_TRIPLE=aarch64-linux-gnu \
-  .
-
-docker container run -it --rm --network=host --name test ros2_benchmark_pipeline:latest bash
-```
-
+## Troubleshooting
 
 #### Lib Poco Issue
 From the ROS2 Cross compilation docs:
