@@ -15,6 +15,7 @@
 import logging
 import os
 from pathlib import Path
+from typing import List
 from typing import Optional
 
 from ros_cross_compile.docker_client import DockerClient
@@ -38,6 +39,7 @@ def gather_rosdeps(
     docker_client: DockerClient,
     platform: Platform,
     workspace: Path,
+    skip_rosdep_keys: List[str] = [],
     custom_script: Optional[Path] = None,
     custom_data_dir: Optional[Path] = None,
 ) -> None:
@@ -75,6 +77,7 @@ def gather_rosdeps(
             'OWNER_USER': str(os.getuid()),
             'ROSDISTRO': platform.ros_distro,
             'TARGET_OS': '{}:{}'.format(platform.os_name, platform.os_distro),
+            'SKIP_ROSDEP_KEYS': ' '.join(skip_rosdep_keys),
             'OUT_PATH': str(out_path),
             'CUSTOM_SETUP': CUSTOM_SETUP,
         },
